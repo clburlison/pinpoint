@@ -1,9 +1,8 @@
 # Makefile for pinpoint related tasks
-# Variables below
 
-INSTALL_PATH="/Library/Application Support/pinpoint"
+INSTALLDIR="./pkgroot/Library/Application Support/pinpoint/bin/"
 PKGTITLE="pinpoint"
-PKGVERSION=$(shell ./pinpoint.py --version)
+PKGVERSION=$(shell python ${INSTALLDIR}/pinpoint --version)
 PKGID=com.clburlison.pinpoint
 PROJECT="pinpoint"
 
@@ -15,16 +14,13 @@ help:
 
 ##  clean - Clean up temporary working directories
 clean:
-	rm -rf pkgroot
 	rm -f ./pinpoint*.{dmg,pkg}
+	rm -f ${INSTALLDIR}/FoundationPlist.*.pyc
 
 ##  pkg - Create a package using pkgbuild
 pkg: clean
-	mkdir -p pkgroot/${INSTALL_PATH}/bin
-	mkdir -p pkgroot/Library/LaunchDaemons
-	cp ./pinpoint.py pkgroot/${INSTALL_PATH}/bin
-	cp ./com.clburlison.pinpoint.plist pkgroot/Library/LaunchDaemons/
-	pkgbuild --root pkgroot --identifier ${PKGID} --version ${PKGVERSION} --ownership recommended ./${PKGTITLE}-${PKGVERSION}.pkg
+	cp ./pinpoint ${INSTALLDIR}
+	pkgbuild --root pkgroot --scripts scripts --identifier ${PKGID} --version ${PKGVERSION} --ownership recommended ./${PKGTITLE}-${PKGVERSION}.pkg
 
 ##  dmg - Wrap the package inside a dmg
 dmg: pkg
