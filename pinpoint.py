@@ -1,11 +1,13 @@
 #!/usr/bin/python
-"""Enables location services (LS),
+"""
+Enables location services (LS),
 gives Python access to location services,
 and stores the location of your mac to a plist
 by default.
-
-Author: Clayton Burlison <https://clburlison.com>
 """
+
+__author__ = 'Clayton Burlison (https://clburlison.com)'
+__version__ = '0.0.1'
 
 import sys
 import os
@@ -24,7 +26,15 @@ import objc
 # No name 'Foo' in module 'Bar' warnings. Disable them.
 # pylint: disable=E0611
 from CoreLocation import CLLocationManager, kCLDistanceFilterNone, kCLLocationAccuracyBest
-from Foundation import NSRunLoop, NSDate, NSObject, NSBundle, CFPreferencesCopyAppValue
+from Foundation import NSRunLoop, NSDate, NSObject, NSBundle
+from Foundation import CFPreferencesAppSynchronize
+from Foundation import CFPreferencesCopyAppValue
+from Foundation import CFPreferencesCopyKeyList
+from Foundation import CFPreferencesSetValue
+from Foundation import kCFPreferencesAnyUser
+from Foundation import kCFPreferencesCurrentUser
+from Foundation import kCFPreferencesCurrentHost
+
 try:
     sys.path.append('/usr/local/munki/munkilib/')
     import FoundationPlist
@@ -32,11 +42,8 @@ except ImportError as error:
     logging.warn(error)
     exit(0)
 
-# Skip manual check
-if len(sys.argv) > 1:
-    if sys.argv[1] == 'manualcheck':
-        logging.info("Manual check: skipping")
-        exit(0)
+# Our preferences "bundle_id"
+BUNDLE_ID = 'com.clburlison.pinpoint'
 
 # Create cache dir if it does not exist
 # pylint: disable=C0103
@@ -45,7 +52,7 @@ if not os.path.exists(cachedir):
     os.makedirs(cachedir)
 
 # Define location.plist
-location = cachedir + "/location.plist"
+location = cachedir + "/location.plist" 
 
 # Create global plist object for data storage
 plist = dict()
@@ -91,6 +98,60 @@ def os_check():
         logging.warn(status)
         write_to_cache_location(None, status)
         exit(0)
+
+def reload_prefs():
+    """Uses CFPreferencesAppSynchronize(BUNDLE_ID)
+    to make sure we have the latest prefs. Call this
+    if you have modified /Library/Preferences/ManagedInstalls.plist
+    or /var/root/Library/Preferences/ManagedInstalls.plist directly"""
+    CFPreferencesAppSynchronize(BUNDLE_ID)
+
+
+def set_pref(pref_name, pref_value):
+    """Sets a preference, writing it to
+    /Library/Preferences/ManagedInstalls.plist.
+    This should normally be used only for 'bookkeeping' values;
+    values that control the behavior of munki may be overridden
+    elsewhere (by MCX, for example)"""
+    try:
+        CFPreferencesSetValue(
+            pref_name, pref_value, BUNDLE_ID,
+            kCFPreferencesAnyUser, kCFPreferencesCurrentHost)
+        CFPreferencesAppSynchronize(BUNDLE_ID)
+    except BaseException:
+        pass
+
+def pref(pref_name):
+    """Return a preference. Since this uses CFPreferencesCopyAppValue,
+    Preferences can be defined several places. Precedence is:
+        - MCX/profile
+        - /Library/Preferences/com.clburlison.pinpoint.plist
+        - default_prefs defined here.
+    """
+    default_prefs = {
+        'ManagedInstallDir': '/Library/Managed Installs',
+        'SoftwareRepoURL': 'http://munki/repo',
+        'ClientIdentifier': '',
+        'LogFile': '/Library/Managed Installs/Logs/ManagedSoftwareUpdate.log',
+        'LoggingLevel': 1,
+        'LogToSyslog': False,
+        'InstallAppleSoftwareUpdates': False,
+        'AppleSoftwareUpdatesOnly': False,
+        'SoftwareUpdateServerURL': '',
+        'DaysBetweenNotifications': 1,
+        'LastNotifiedDate': NSDate.dateWithTimeIntervalSince1970_(0),
+    }
+    pref_value = CFPreferencesCopyAppValue(pref_name, BUNDLE_ID)
+    if pref_value == None:
+        pref_value = default_prefs.get(pref_name)
+        # we're using a default value. We'll write it out to
+        # /Library/Preferences/<BUNDLE_ID>.plist for admin
+        # discoverability
+        set_pref(pref_name, pref_value)
+    if isinstance(pref_value, NSDate):
+        # convert NSDate/CFDates to strings
+        pref_value = str(pref_value)
+    return pref_value
 
 def current_time_GMT():
     """Prints current date/time stamp"""
@@ -349,13 +410,20 @@ def main():
             our lookup request finding your mac if possible.")
     parser.add_argument('-v', '--verbose', action='count', default=0, help=" \
             More verbose output. May be specified multiple times.")
-    args, unknown = parser.parse_known_args()
+    parser.add_argument('--version', action='store_true', help=" \
+            Print script version")
+    # args, unknown = parser.parse_known_args()
+    args = parser.parse_args()
 
     levels = [logging.WARN, logging.INFO, logging.DEBUG]
     level = levels[min(len(levels)-1, args.verbose)]  # capped to number of levels
 
     logging.basicConfig(level=level,
                         format="%(levelname)s: %(message)s")
+
+    if args.version:
+        print __version__
+        exit()
 
     os_check()
     if mac_has_wireless() is False:
