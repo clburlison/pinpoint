@@ -10,8 +10,6 @@ Provides location information on where a Mac is physical located.
 The script uses Apple's CoreLocation framework to determine the approximate latitude, and longitude of a Mac.
 
 Author: Clayton Burlison - https://clburlison.com  
-Created: Jan. 25, 2016  
-Updated: Feb. 14, 2016  
 
 
 ##Limitations
@@ -99,3 +97,4 @@ Based off of works by:
 @pudquick - https://gist.github.com/pudquick/329142c1740500bd3797  
 @lindes   - https://github.com/lindes/get-location/  
 University of Utah, Marriott Library - https://github.com/univ-of-utah-marriott-library-apple/privacy_services_manager  
+Munki, - https://github.com/munki/munki/blob/master/code/client/munkilib/FoundationPlist.py
