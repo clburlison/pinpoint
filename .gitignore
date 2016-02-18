@@ -1,7 +1,5 @@
 .DS_Store
-pkgroot/
 tmp/
 .pyc
-cache
 *.pkg
 *.dmg
