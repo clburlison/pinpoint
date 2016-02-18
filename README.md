@@ -1,11 +1,9 @@
 pinpoint
 ===
 
+![pinpoint logo](/support_files/pinpoint-logo.png)
 
 
-
-Location module
-==============
 
 Provides location information on where a Mac is physical located.
 
