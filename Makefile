@@ -19,7 +19,6 @@ clean:
 
 ##  pkg - Create a package using pkgbuild
 pkg: clean
-	cp ./pinpoint ${INSTALLDIR}
 	pkgbuild --root pkgroot --scripts scripts --identifier ${PKGID} --version ${PKGVERSION} --ownership recommended ./${PKGTITLE}-${PKGVERSION}.pkg
 
 ##  dmg - Wrap the package inside a dmg
