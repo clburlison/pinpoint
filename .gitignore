@@ -3,3 +3,5 @@ pkgroot/
 tmp/
 .pyc
 cache
+*.pkg
+*.dmg
