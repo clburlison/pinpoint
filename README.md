@@ -20,10 +20,13 @@ _coming soon_
 
 #Credits
 Based off of works by:  
-[@arubdesu](https://github.com/arubdesu) - https://gist.github.com/arubdesu/b72585771a9f606ad800  
-[@pudquick](https://github.com/pudquick) - https://gist.github.com/pudquick/c7dd1262bd81a32663f0  
-[@pudquick](https://github.com/pudquick) - https://gist.github.com/pudquick/329142c1740500bd3797  
-[@lindes](https://github.com/lindes)   - https://github.com/lindes/get-location/  
-[University of Utah, Marriott Library](https://github.com/univ-of-utah-marriott-library-apple) - [privacy_services_manager](https://github.com/univ-of-utah-marriott-library-apple/privacy_services_manager)  
-[Munki](https://github.com/munki), - [FoundationPlist.py](https://github.com/munki/munki/blob/master/code/client/munkilib/FoundationPlist.py)  
-[Google Inc.](https://github.com/macops), [supervisor](https://github.com/munki/munki/blob/master/code/client/supervisor)
+
+| Author  |  Project Link |
+|---|---|
+| [@arubdesu](https://github.com/arubdesu) | https://gist.github.com/arubdesu/b72585771a9f606ad800 |
+| [@pudquick](https://github.com/pudquick) | https://gist.github.com/pudquick/c7dd1262bd81a32663f0 |
+| [@pudquick](https://github.com/pudquick) | https://gist.github.com/pudquick/329142c1740500bd3797 | 
+| [@lindes](https://github.com/lindes)   | https://github.com/lindes/get-location/ | 
+| [University of Utah, Marriott Library](https://github.com/univ-of-utah-marriott-library-apple) | [privacy_services_manager](https://github.com/univ-of-utah-marriott-library-apple/privacy_services_manager) |
+| [Munki](https://github.com/munki) | [FoundationPlist.py](https://github.com/munki/munki/blob/master/code/client/munkilib/FoundationPlist.py) |
+| [Google Inc.](https://github.com/macops) | [supervisor](https://github.com/munki/munki/blob/master/code/client/supervisor) |
