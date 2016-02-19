@@ -1,10 +1,10 @@
 pinpoint
 ===
 
-![pinpoint logo](/support_files/pinpoint-logo.png)
+![pinpoint logo](/support_files/pinpoint-logo-wide.png)
 
 
-Provides location information on where a Mac is physical located.
+Python based location script for enabling and finding your Mac.
 
 The script uses Apple's CoreLocation framework to determine the approximate latitude, and longitude of a Mac.
 
@@ -24,6 +24,6 @@ Based off of works by:
 [@pudquick](https://github.com/pudquick) - https://gist.github.com/pudquick/c7dd1262bd81a32663f0  
 [@pudquick](https://github.com/pudquick) - https://gist.github.com/pudquick/329142c1740500bd3797  
 [@lindes](https://github.com/lindes)   - https://github.com/lindes/get-location/  
-[University of Utah, Marriott Library](https://github.com/univ-of-utah-marriott-library-apple) - https://github.com/univ-of-utah-marriott-library-apple/privacy_services_manager  
-[Munki](https://github.com/munki), - https://github.com/munki/munki/blob/master/code/client/munkilib/FoundationPlist.py
-[Google Inc.](https://github.com/macops), https://github.com/munki/munki/blob/master/code/client/supervisor
+[University of Utah, Marriott Library](https://github.com/univ-of-utah-marriott-library-apple) - [privacy_services_manager](https://github.com/univ-of-utah-marriott-library-apple/privacy_services_manager)  
+[Munki](https://github.com/munki), - [FoundationPlist.py](https://github.com/munki/munki/blob/master/code/client/munkilib/FoundationPlist.py)  
+[Google Inc.](https://github.com/macops), [supervisor](https://github.com/munki/munki/blob/master/code/client/supervisor)
