@@ -3,16 +3,25 @@ pinpoint
 
 ![pinpoint logo](/support_files/pinpoint-logo-wide.png)
 
-
 Python based location script for enabling and finding your Mac.
-
-The script uses Apple's CoreLocation framework to determine the approximate latitude, and longitude of a Mac.
 
 Author: Clayton Burlison - https://clburlison.com  
 
 
-#Limitations
-This module is limited to 10.8 - 10.11. On each run Location Services will be enabled, and the system Python binary will be given access to Location Services (LS). Due to how LS and the CoreLocation framework interact the first run to enable all the services has an exit after enabling Python plus LS. This exit will normally not be seen as Munki will automatically deploy the script and provide lookups on the second automatic munki run. The reason for this "delay" in activation is because the services need about 30 seconds to initialize the locationd daemon. However, munki's preflight script will timeout the script for waiting too long. After initial setup, sequential runs take about 6-8 seconds and have a pretty high accuracy.
+#What does pinpoint do?
+This script is limited to **10.8 - 10.11**. 
+
+This script uses Apple's CoreLocation framework to determine the approximate latitude, and longitude of your Mac.
+
+Currently, on each run Location Services will be enabled, and the system Python binary will be given access to Location Services (LS). Due to how LS and the CoreLocation framework interact the first run to enable all the services will take ~45 seconds. Sequential runs take about 8-12 seconds and have a pretty high accuracy.
+
+After the run pinpoint will write a plist file containing the data from the run. By default this file ends up: 
+
+```bash
+/Library/Application\ Support/pinpoint/location.plist
+```
+
+More information can be found on the [Wiki](https://github.com/clburlison/pinpoint/wiki).
 
 #Legal Notice
 _coming soon_
