@@ -6,9 +6,6 @@ and stores the location of your mac to a plist
 by default.
 """
 
-__author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '0.0.1'
-
 import sys
 import os
 import plistlib
@@ -19,9 +16,9 @@ import argparse
 import logging
 import json
 from urllib2 import urlopen, URLError, HTTPError
-from time import gmtime, strftime
+from datetime import datetime, timedelta
+from time import gmtime, strftime, strptime
 import objc
-sys.path.append('/usr/local/munki/munkilib/')
 import FoundationPlist
 
 # PyLint cannot properly find names inside Cocoa libraries, so issues bogus
@@ -37,9 +34,14 @@ from Foundation import kCFPreferencesAnyUser
 from Foundation import kCFPreferencesCurrentUser
 from Foundation import kCFPreferencesCurrentHost
 
+__author__ = 'Clayton Burlison (https://clburlison.com)'
+__version__ = '0.0.1'
+
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
 
+# Disable PyLint variable name checks
+# pylint: disable=C0103
 # Create global plist object for data storage
 plist = dict()
 
@@ -92,7 +94,6 @@ def reload_prefs():
     """
     CFPreferencesAppSynchronize(BUNDLE_ID)
 
-
 def set_pref(pref_name, pref_value):
     """Sets a preference, writing it to
     /Library/Preferences/com.clburlison.pinpoint.plist.
@@ -116,23 +117,60 @@ def pref(pref_name):
     """
     default_prefs = {
         'CacheDir': '/Library/Application Support/pinpoint',
+        'CheckWaitTime': 1800,
     }
     pref_value = CFPreferencesCopyAppValue(pref_name, BUNDLE_ID)
-    if pref_value == None:
+    if pref_value is None:
         pref_value = default_prefs.get(pref_name)
         # we're using a default value. We'll write it out to
         # /Library/Preferences/<BUNDLE_ID>.plist for admin
         # discoverability
         set_pref(pref_name, pref_value)
-    if isinstance(pref_value, NSDate):
-        # convert NSDate/CFDates to strings
-        pref_value = str(pref_value)
     return pref_value
 
-def current_time_GMT():
+def current_time():
     """Prints current date/time stamp"""
-    currentTime = strftime("%Y-%m-%d %H:%M:%S +0000", gmtime())
-    return currentTime
+    timeFormat = "%Y-%m-%d %H:%M:%S +0000"
+    now = strftime(timeFormat, gmtime())
+    return now
+
+def check_wait_period(override):
+    """Limit the amount of lookups a computer will run.
+    We want to use this in conjunction with out LaunchDaemon to
+    make sure we always have updated data available."""
+
+    # If we pass an override, skip this check
+    if override:
+        return True
+
+    # Setup and retrive date/time values for checking
+    now = convert_date_type(current_time())
+    LastCheckDate = pref('LastCheckDate')
+    CheckWaitTime = pref('CheckWaitTime')
+    last_run_time = convert_date_type(LastCheckDate)
+    try:
+        future_run_time = last_run_time + timedelta(seconds=CheckWaitTime)
+        if now >= future_run_time:
+            return True
+        else:
+            logging.warn("It is not time to run again! Use '-f' "
+                         "if you wish to force an lookup.")
+            exit(1)
+    except TypeError:
+        return True
+
+def convert_date_type(strDate):
+    """Convert date string type to date type."""
+    try:
+        return datetime.strptime(strDate, "%Y-%m-%d %H:%M:%S +0000")
+    except TypeError:
+        pass
+
+def update_check_time():
+    """Record last check time"""
+    now = current_time()
+    logging.debug("Updating 'LastCheckDate' timestamp")
+    set_pref('LastCheckDate', now)
 
 def write_to_cache_location(data, status):
     """Method to write plist data to disk"""
@@ -141,11 +179,13 @@ def write_to_cache_location(data, status):
         plist = data
     base_stats = dict(
         CurrentStatus=str(status),
-        LastRun=str(current_time_GMT()),
+        LastRun=current_time(),
         LS_Enabled=is_enabled,
     )
-    plist.update(base_stats)    
+    plist.update(base_stats)
     output_file = os.path.join(pref('CacheDir'), "location.plist")
+    logging.debug("Writing current run details to: %s", 
+                  output_file)
     plistlib.writePlist(plist, output_file)
 
 def mac_has_wireless():
@@ -242,11 +282,8 @@ def add_python():
         FoundationPlist.writePlist(clients_dict, das_plist)
         os.chown(das_plist, 205, 205)
         service_handler('load')
-        # We need to wait 30 secs for locationd service to initial on first setup.
-        status = "Location Services was enabled. Please wait 30 seconds before doing a lookup."
-        write_to_cache_location(None, status)
-        logging.warn(status)
-        exit(0)
+        logger.info("Location Services was enabled. We are waiting 30 seconds before doing a lookup.")
+        time.sleep(30)
     else:
         logging.info("Python is enabled")
 
@@ -347,7 +384,7 @@ def download_file(url):
     except (OSError, IOError):
         pass
     return data
-
+    
 def address_resolve(lat, lon):
     """Use Google's Reverse GeoCoding API to resolve coordinates to an street address."""
     try:
@@ -375,15 +412,17 @@ def munkireport_prefs():
         return True
 
 def main():
-    """Locate Mac"""
-    parser = argparse.ArgumentParser(description="This script will \
-            enable Location Services and Python if your mac is supported. \
-            Python and the CoreLocation framework will process \
-            our lookup request finding your mac if possible.")
-    parser.add_argument('-v', '--verbose', action='count', default=0, help=" \
-            More verbose output. May be specified multiple times.")
-    parser.add_argument('-V', '--version', action='store_true', help=" \
-            Print script version")
+    """Main method for handling options."""
+    parser = argparse.ArgumentParser(prog='pinpoint', 
+            description='This script will attempt to locate your mac.')
+    parser.add_argument('--auto', action='store_true', default=True, 
+            help='Used by the LaunchDaemon to find your mac in the background.')
+    parser.add_argument('-v', '--verbose', action='count', default=0, 
+            help='More verbose output. May be specified multiple times.')
+    parser.add_argument('-f', '--force', action='store_true', 
+            help='Force the location lookup run disregarding last check time.')
+    parser.add_argument('-V', '--version', action='store_true', 
+            help='Print script version')
     # args, unknown = parser.parse_known_args()
     args = parser.parse_args()
 
@@ -397,43 +436,53 @@ def main():
         print __version__
         exit()
 
+    # This is the cache directory where we store our found location
     cachedir = pref('CacheDir')
     if not os.path.exists(cachedir):
         os.makedirs(cachedir)
 
-    os_check()
-    if mac_has_wireless() is False:
-        status = "No wireless interface found."
-        write_to_cache_location(None, status)
-        logging.warn(status)
-        exit(0)
-    root_check()
-    sysprefs_boxchk()
-    add_python()
-    lookup(8)
-    global plist
-    try:
-        if munkireport_prefs() is True:
-            if plist['Latitude']:
-                add = dict(
-                    Address=str(address_resolve(plist['Latitude'], plist['Longitude'])),
-                )
-                plist.update(add)
-        else:
-            add = dict(
-                Address=str('Address lookup has been disabled on this computer.'),
-            )
-            plist.update(add)
-    except:
-        pass
-    try:
-        write_to_cache_location(plist, plist['CurrentStatus'])
-        logging.info("Run status: %s", plist['CurrentStatus'])
-    except KeyError:
-        status = ("Error obtaining a location. LS was unresponsive "
-                  "or a lookup timeout occurred.")
-        logging.warn(status)
-        write_to_cache_location(plist, status)
+    # Set default variable values for args
+    override = False 
+
+    if args.force:
+        override = True
+    
+    if args.auto:
+        os_check()
+        if mac_has_wireless() is False:
+            status = "No wireless interface found."
+            write_to_cache_location(None, status)
+            logging.warn(status)
+            exit(0)
+        root_check()
+        sysprefs_boxchk()
+        add_python()
+        if check_wait_period(override):    
+            update_check_time()
+            lookup(8)
+            global plist
+            try:
+                if munkireport_prefs() is True:
+                    if plist['Latitude']:
+                        add = dict(
+                            Address=str(address_resolve(plist['Latitude'], plist['Longitude'])),
+                        )
+                        plist.update(add)
+                else:
+                    add = dict(
+                        Address=str('Address lookup has been disabled on this computer.'),
+                    )
+                    plist.update(add)
+            except:
+                pass
+            try:
+                write_to_cache_location(plist, plist['CurrentStatus'])
+                logging.info("Run status: %s", plist['CurrentStatus'])
+            except KeyError:
+                status = ("Error obtaining a location. LS was unresponsive "
+                          "or a lookup timeout occurred.")
+                logging.warn(status)
+                write_to_cache_location(plist, status)
 
 if __name__ == '__main__':
     main()
