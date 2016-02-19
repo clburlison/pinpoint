@@ -1,8 +1,7 @@
 # Makefile for pinpoint related tasks
 
-INSTALLDIR="./pkgroot/Library/Application Support/pinpoint/bin/"
 PKGTITLE="pinpoint"
-PKGVERSION=$(shell python ${INSTALLDIR}/pinpoint --version)
+PKGVERSION="0.0.1"
 PKGID=com.clburlison.pinpoint
 PROJECT="pinpoint"
 
@@ -15,7 +14,7 @@ help:
 ##  clean - Clean up temporary working directories
 clean:
 	rm -f ./pinpoint*.{dmg,pkg}
-	rm -f ${INSTALLDIR}/FoundationPlist.*.pyc
+	rm -f ./pkgroot/Library/Application\ Support/pinpoint/bin/FoundationPlist/*.pyc
 
 ##  pkg - Create a package using pkgbuild
 pkg: clean

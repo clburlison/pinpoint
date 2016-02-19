@@ -17,7 +17,7 @@ import logging
 import json
 from urllib2 import urlopen, URLError, HTTPError
 from datetime import datetime, timedelta
-from time import gmtime, strftime, strptime
+from time import gmtime, strftime, strptime, sleep
 import objc
 import FoundationPlist
 
@@ -282,8 +282,8 @@ def add_python():
         FoundationPlist.writePlist(clients_dict, das_plist)
         os.chown(das_plist, 205, 205)
         service_handler('load')
-        logger.info("Location Services was enabled. We are waiting 30 seconds before doing a lookup.")
-        time.sleep(30)
+        logging.info("Location Services was enabled. We are waiting 30 seconds before doing a lookup.")
+        sleep(30)
     else:
         logging.info("Python is enabled")
 
@@ -477,6 +477,7 @@ def main():
                 pass
             try:
                 write_to_cache_location(plist, plist['CurrentStatus'])
+                logging.info("Current location: %s, %s", plist['Latitude'], plist['Longitude'])
                 logging.info("Run status: %s", plist['CurrentStatus'])
             except KeyError:
                 status = ("Error obtaining a location. LS was unresponsive "
