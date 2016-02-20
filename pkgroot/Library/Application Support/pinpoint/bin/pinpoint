@@ -412,16 +412,39 @@ def download_file(url):
         pass
     return data
     
-def address_resolve(lat, lon):
-    """Use Google's Reverse GeoCoding API to resolve coordinates to an street address."""
-    try:
-        url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=%s,%s' % (lat, lon)
-        data = download_file(url)
-        obj = json.loads(data)
-        return obj["results"][0]["formatted_address"]
-    except:
-        logging.info("google reverse lookup failed")
-        pass
+def address_lookup(service):
+    """Resolve coordinates to a street address."""
+    global plist
+    
+    if pref('AddressLookup'):
+        try:
+            if plist['Latitude']:
+                lat = plist['Latitude']
+                lon = plist['Longitude']
+                if service == 'google':
+                    try:
+                        url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=%s,%s' % (lat, lon)
+                        data = download_file(url)
+                        obj = json.loads(data)
+                        address = obj["results"][0]["formatted_address"]
+                    except:
+                        logging.info("Google reverse lookup failed.")
+                        pass
+                elif service == 'apple':
+                    address = 'Apple reverse lookup not supported at this time.'
+                    logging.warn(address)
+                else:
+                    address = "Unsupported address lookup service: " + service
+                    logging.warn(address)
+        except KeyError:
+            address = 'Unable to determine address'
+            logging.warn(address)
+    else:
+        address = 'Address lookup has been disabled on this computer.'
+
+    # update plist with the address data
+    add = dict(Address=str(address),)
+    plist.update(add)
 
 def main():
     """Main method for handling options."""
@@ -474,23 +497,9 @@ def main():
                 enable_wireless()
             update_check_time()
             lookup(8)
-            global plist
+            address_lookup('google')
             try:
-                if pref('AddressLookup'):
-                    if plist['Latitude']:
-                        address = address_resolve(plist['Latitude'], plist['Longitude'])
-                        add = dict(
-                            Address=str(address),
-                        )
-                        plist.update(add)
-                else:
-                    add = dict(
-                        Address=str('Address lookup has been disabled on this computer.'),
-                    )
-                    plist.update(add)
-            except:
-                pass
-            try:
+                global plist
                 write_to_cache_location(plist, plist['CurrentStatus'])
                 logging.info("Current location: %s, %s", plist['Latitude'], plist['Longitude'])
                 logging.info("Run status: %s", plist['CurrentStatus'])
