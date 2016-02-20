@@ -119,6 +119,7 @@ def pref(pref_name):
         'AddressLookup': True,
         'CacheDir': '/Library/Application Support/pinpoint',
         'CheckWaitTime': 1800,
+        'EnableWireless': False,
     }
     pref_value = CFPreferencesCopyAppValue(pref_name, BUNDLE_ID)
     if pref_value is None:
@@ -192,11 +193,36 @@ def write_to_cache_location(data, status):
 def mac_has_wireless():
     """Check to see if this Mac has a wireless NIC. If it doesn't the
     CoreLocation lookup will fail."""
-    wifi = CWInterface.interfaceNames()
-    if wifi:
+    iface_name = CWInterface.interfaceNames()
+    if iface_name:
         return True
     else:
         return False
+
+def enable_wireless():
+    """Enable the wireless adapter. Determine current power state prior 
+    to turning the wireless adapter on. If the adapter is already on continue.
+    """
+    iface_name = CWInterface.interfaceNames()
+
+    # This handles a case where we have no wireless interface
+    # and the return value is None
+    if iface_name:
+        # The first interface can be assumed to be the airport card
+        iface_name = iface_name.itervalues().next()
+        command = ['/usr/sbin/networksetup', '-getairportpower', 
+                  iface_name]
+        proc = subprocess.Popen(command, shell=False,stdout=subprocess.PIPE)
+        wifi_power = (proc.communicate()[0].replace('\n', '')
+                           .split(":")[1].replace(' ', ''))
+        logging.debug("Wireless adapter is currently: %s", 
+                      wifi_power)
+
+    if wifi_power == 'Off':
+        iface = CWInterface.interface()
+        iface.setPower_error_(True, None)
+        logging.debug("Wireless adapter has been turned on.")
+        sleep(5)
 
 def service_handler(action):
     """Loads/unloads System's location services launchd job."""
@@ -444,11 +470,13 @@ def main():
         sysprefs_boxchk()
         add_python()
         if check_wait_period(override):    
+            if pref('EnableWireless'):
+                enable_wireless()
             update_check_time()
             lookup(8)
             global plist
             try:
-                if pref('AddressLookup') is True:
+                if pref('AddressLookup'):
                     if plist['Latitude']:
                         address = address_resolve(plist['Latitude'], plist['Longitude'])
                         add = dict(
