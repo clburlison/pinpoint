@@ -5,4 +5,7 @@
 [[ $3 != "/" ]] && exit 0
 /bin/launchctl load /Library/LaunchDaemons/com.clburlison.pinpoint.plist
 
+# First run of pinpoint
+"/Library/Application Support/pinpoint/bin/pinpoint"
+
 exit 0
