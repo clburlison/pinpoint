@@ -116,6 +116,7 @@ def pref(pref_name):
         - default_prefs defined here.
     """
     default_prefs = {
+        'AddressLookup': True,
         'CacheDir': '/Library/Application Support/pinpoint',
         'CheckWaitTime': 1800,
     }
@@ -396,21 +397,6 @@ def address_resolve(lat, lon):
         logging.info("google reverse lookup failed")
         pass
 
-def munkireport_prefs():
-    """Read MunkiReport preferences file to term if we should lookup the
-    client computers estimated address using Google's Reverse Geocode API."""
-    munki_report = "/Library/Preferences/MunkiReport.plist"
-    prefs = CFPreferencesCopyAppValue('ReportPrefs', munki_report)
-    if prefs:
-        if prefs.get('location_address_lookup'):
-            logging.info("address lookup enabled")
-            return True
-        else:
-            logging.info("address lookup disabled")
-            return False
-    else:
-        return True
-
 def main():
     """Main method for handling options."""
     parser = argparse.ArgumentParser(prog='pinpoint', 
@@ -462,10 +448,11 @@ def main():
             lookup(8)
             global plist
             try:
-                if munkireport_prefs() is True:
+                if pref('AddressLookup') is True:
                     if plist['Latitude']:
+                        address = address_resolve(plist['Latitude'], plist['Longitude'])
                         add = dict(
-                            Address=str(address_resolve(plist['Latitude'], plist['Longitude'])),
+                            Address=str(address),
                         )
                         plist.update(add)
                 else:
