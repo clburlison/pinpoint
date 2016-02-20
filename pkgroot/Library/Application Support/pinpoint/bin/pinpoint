@@ -6,7 +6,6 @@ and stores the location of your mac to a plist
 by default.
 """
 
-import sys
 import os
 import plistlib
 import platform
@@ -17,7 +16,7 @@ import logging
 import json
 from urllib2 import urlopen, URLError, HTTPError
 from datetime import datetime, timedelta
-from time import gmtime, strftime, strptime, sleep
+from time import gmtime, strftime, sleep
 import objc
 import FoundationPlist
 
@@ -28,10 +27,10 @@ from CoreLocation import CLLocationManager, kCLDistanceFilterNone, kCLLocationAc
 from Foundation import NSRunLoop, NSDate, NSObject, NSBundle
 from Foundation import CFPreferencesAppSynchronize
 from Foundation import CFPreferencesCopyAppValue
-from Foundation import CFPreferencesCopyKeyList
+# from Foundation import CFPreferencesCopyKeyList
 from Foundation import CFPreferencesSetValue
 from Foundation import kCFPreferencesAnyUser
-from Foundation import kCFPreferencesCurrentUser
+# from Foundation import kCFPreferencesCurrentUser
 from Foundation import kCFPreferencesCurrentHost
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
@@ -81,7 +80,6 @@ def os_vers():
 def os_check():
     """Only tested on 10.8 - 10.11."""
     if not 8 <= int(os_vers()) <= 11:
-        global plist
         status = "Your OS is not supported at this time: %s" % platform.mac_ver()[0]
         logging.warn(status)
         write_to_cache_location(None, status)
@@ -186,7 +184,7 @@ def write_to_cache_location(data, status):
     )
     plist.update(base_stats)
     output_file = os.path.join(pref('CacheDir'), "location.plist")
-    logging.debug("Writing current run details to: %s", 
+    logging.debug("Writing current run details to: %s",
                   output_file)
     plistlib.writePlist(plist, output_file)
 
@@ -194,13 +192,10 @@ def mac_has_wireless():
     """Check to see if this Mac has a wireless NIC. If it doesn't the
     CoreLocation lookup will fail."""
     iface_name = CWInterface.interfaceNames()
-    if iface_name:
-        return True
-    else:
-        return False
+    return True if iface_name else False
 
 def enable_wireless():
-    """Enable the wireless adapter. Determine current power state prior 
+    """Enable the wireless adapter. Determine current power state prior
     to turning the wireless adapter on. If the adapter is already on continue.
     """
     iface_name = CWInterface.interfaceNames()
@@ -210,12 +205,12 @@ def enable_wireless():
     if iface_name:
         # The first interface can be assumed to be the airport card
         iface_name = iface_name.itervalues().next()
-        command = ['/usr/sbin/networksetup', '-getairportpower', 
-                  iface_name]
-        proc = subprocess.Popen(command, shell=False,stdout=subprocess.PIPE)
+        command = ['/usr/sbin/networksetup', '-getairportpower',
+                   iface_name]
+        proc = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE)
         wifi_power = (proc.communicate()[0].replace('\n', '')
-                           .split(":")[1].replace(' ', ''))
-        logging.debug("Wireless adapter is currently: %s", 
+                      .split(":")[1].replace(' ', ''))
+        logging.debug("Wireless adapter is currently: %s",
                       wifi_power)
 
     if wifi_power == 'Off':
@@ -309,7 +304,8 @@ def add_python():
         FoundationPlist.writePlist(clients_dict, das_plist)
         os.chown(das_plist, 205, 205)
         service_handler('load')
-        logging.info("Location Services was enabled. We are waiting 30 seconds before doing a lookup.")
+        logging.info("Location Services was enabled. "
+                     "We are waiting 30 seconds before doing a lookup.")
         sleep(30)
     else:
         logging.info("Python is enabled")
@@ -411,11 +407,11 @@ def download_file(url):
     except (OSError, IOError):
         pass
     return data
-    
+
 def address_lookup(service):
     """Resolve coordinates to a street address."""
     global plist
-    
+    google_api_url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng='
     if pref('AddressLookup'):
         try:
             if plist['Latitude']:
@@ -423,18 +419,18 @@ def address_lookup(service):
                 lon = plist['Longitude']
                 if service == 'google':
                     try:
-                        url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=%s,%s' % (lat, lon)
+                        url = '%s%s,%s' % (google_api_url, lat, lon)
                         data = download_file(url)
                         obj = json.loads(data)
                         address = obj["results"][0]["formatted_address"]
                     except:
-                        logging.info("Google reverse lookup failed.")
-                        pass
+                        address = 'Google reverse lookup failed.'
+                        logging.warn(address)
                 elif service == 'apple':
                     address = 'Apple reverse lookup not supported at this time.'
                     logging.warn(address)
                 else:
-                    address = "Unsupported address lookup service: " + service
+                    address = 'Unsupported address lookup service: ' + service
                     logging.warn(address)
         except KeyError:
             address = 'Unable to determine address'
@@ -448,17 +444,16 @@ def address_lookup(service):
 
 def main():
     """Main method for handling options."""
-    parser = argparse.ArgumentParser(prog='pinpoint', 
-            description='This script will attempt to locate your mac.')
-    parser.add_argument('--auto', action='store_true', default=True, 
-            help='Used by the LaunchDaemon to find your mac in the background.')
-    parser.add_argument('-v', '--verbose', action='count', default=0, 
-            help='More verbose output. May be specified multiple times.')
-    parser.add_argument('-f', '--force', action='store_true', 
-            help='Force the location lookup run disregarding last check time.')
-    parser.add_argument('-V', '--version', action='store_true', 
-            help='Print script version')
-    # args, unknown = parser.parse_known_args()
+    parser = argparse.ArgumentParser(prog='pinpoint',
+                                     description='This script will attempt to locate your mac.')
+    parser.add_argument('--auto', action='store_true', default=True,
+                        help='Used by the LaunchDaemon to find your mac in the background.')
+    parser.add_argument('-v', '--verbose', action='count', default=0,
+                        help='More verbose output. May be specified multiple times.')
+    parser.add_argument('-f', '--force', action='store_true',
+                        help='Force the location lookup run disregarding last check time.')
+    parser.add_argument('-V', '--version', action='store_true',
+                        help='Print script version')
     args = parser.parse_args()
 
     levels = [logging.WARN, logging.INFO, logging.DEBUG]
@@ -477,11 +472,11 @@ def main():
         os.makedirs(cachedir)
 
     # Set default variable values for args
-    override = False 
+    override = False
 
     if args.force:
         override = True
-    
+
     if args.auto:
         os_check()
         if mac_has_wireless() is False:
@@ -492,7 +487,7 @@ def main():
         root_check()
         sysprefs_boxchk()
         add_python()
-        if check_wait_period(override):    
+        if check_wait_period(override):
             if pref('EnableWireless'):
                 enable_wireless()
             update_check_time()
