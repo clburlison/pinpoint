@@ -174,12 +174,12 @@ def write_to_cache_location(data, status, past_loc):
     if data is not None:
         plist = data
     if past_loc is not None:
-        stale_record = dict(StaleLocation=bool(True),)
+        stale_record = dict(StaleLocation=str('Yes'),)
     base_stats = dict(
         CurrentStatus=str(status),
         LastRun=str(current_time()),
         LS_Enabled=bool(is_enabled),
-        StaleLocation=bool(False),
+        StaleLocation=str('No'),
     )
     plist.update(base_stats)
     if status != "Successful":
