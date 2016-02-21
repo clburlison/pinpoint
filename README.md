@@ -3,17 +3,18 @@ pinpoint
 
 ![pinpoint logo](/support_files/pinpoint-logo-wide.png)
 
-Python based location script for enabling and finding your Mac.
+A python script for finding your Mac
 
 Author: Clayton Burlison - https://clburlison.com  
 
 
-#What does pinpoint do?
-This script is limited to **10.8 - 10.11**. 
+#Info
 
-This script uses Apple's CoreLocation framework to determine the approximate latitude, and longitude of your Mac.
+This script uses Apple's [CoreLocation framework](https://developer.apple.com/library/ios/documentation/CoreLocation/Reference/CoreLocation_Framework/) to determine the approximate location of your Mac.
 
-Currently, on each run Location Services will be enabled, and the system Python binary will be given access to Location Services (LS). Due to how LS and the CoreLocation framework interact the first run to enable all the services will take ~45 seconds. Sequential runs take about 8-12 seconds and have a pretty high accuracy.
+Limited to **10.8 - 10.11**. 
+
+On each run Location Services will be enabled, and the system Python binary will be given access to Location Services (LS). Due to how LS and the CoreLocation framework interact the first run to enable all the services will take ~45 seconds. Sequential runs take about 8-12 seconds and have a pretty high accuracy.
 
 After the run pinpoint will write a plist file containing the data from the run. By default this file ends up: 
 
