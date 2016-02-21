@@ -194,12 +194,9 @@ def mac_has_wireless():
     iface_name = CWInterface.interfaceNames()
     return True if iface_name else False
 
-def enable_wireless():
-    """Enable the wireless adapter. Determine current power state prior
-    to turning the wireless adapter on. If the adapter is already on continue.
-    """
+def wireless_status():
+    """Determine current power state for wireless adapter."""
     iface_name = CWInterface.interfaceNames()
-
     # This handles a case where we have no wireless interface
     # and the return value is None
     if iface_name:
@@ -212,7 +209,11 @@ def enable_wireless():
                       .split(":")[1].replace(' ', ''))
         logging.debug("Wireless adapter is currently: %s",
                       wifi_power)
+        return wifi_power
 
+def enable_wireless():
+    """Enable the wireless adapter."""
+    wifi_power = wireless_status()
     if wifi_power == 'Off':
         iface = CWInterface.interface()
         iface.setPower_error_(True, None)
@@ -488,9 +489,14 @@ def main():
         sysprefs_boxchk()
         add_python()
         if check_wait_period(override):
+            update_check_time()
             if pref('EnableWireless'):
                 enable_wireless()
-            update_check_time()
+            if wireless_status() == 'Off':
+                status = "Wireless interface is turned off."
+                write_to_cache_location(None, status)
+                logging.warn(status)
+                exit(0)
             lookup(8)
             address_lookup('google')
             try:
