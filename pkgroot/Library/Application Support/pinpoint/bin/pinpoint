@@ -144,6 +144,11 @@ def check_wait_period(override):
     LastCheckDate = pref('LastCheckDate')
     CheckWaitTime = pref('CheckWaitTime')
     last_run_time = convert_date_type(LastCheckDate)
+
+    if CheckWaitTime < 900:
+        logging.warn("Your current CheckWaitTime value of '%s' might not run", CheckWaitTime)
+        logging.warn("as often as you wish due to the LaunchDaemon running pinpoint.")
+
     try:
         future_run_time = last_run_time + timedelta(seconds=CheckWaitTime)
         if now >= future_run_time:
