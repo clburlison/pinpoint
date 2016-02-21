@@ -84,7 +84,7 @@ def os_check():
     if not 8 <= int(os_vers()) <= 11:
         status = "Your OS is not supported at this time: %s" % platform.mac_ver()[0]
         logging.warn(status)
-        write_to_cache_location(None, status)
+        write_to_cache_location(None, status, None)
         exit(0)
 
 def set_pref(pref_name, pref_value):
@@ -168,21 +168,58 @@ def update_check_time():
     logging.debug("Updating 'LastCheckDate' timestamp")
     set_pref('LastCheckDate', now)
 
-def write_to_cache_location(data, status):
+def write_to_cache_location(data, status, past_loc):
     """Method to write plist data to disk"""
     global plist
     if data is not None:
         plist = data
+    if past_loc is not None:
+        stale_record = dict(StaleLocation=bool(True),)
     base_stats = dict(
         CurrentStatus=str(status),
         LastRun=str(current_time()),
-        LS_Enabled=is_enabled,
+        LS_Enabled=bool(is_enabled),
+        StaleLocation=bool(False),
     )
     plist.update(base_stats)
+    if status != "Successful":
+        try:
+            logging.debug("Keep past location as we were unable to "
+                          "determine your current location")
+            plist.update(past_loc)
+            plist.update(stale_record)
+        except TypeError:
+            pass
     output_file = os.path.join(pref('CacheDir'), "location.plist")
     logging.debug("Writing current run details to: %s",
                   output_file)
     plistlib.writePlist(plist, output_file)
+
+def retrieve_past_location():
+    """Return the past location from the on disk plist."""
+    output_file = os.path.join(pref('CacheDir'), "location.plist")
+    logging.debug("Storing past location")
+    try:
+        on_disk = FoundationPlist.readPlist(output_file)
+    except (AttributeError,
+            FoundationPlist.NSPropertyListSerializationException):
+        on_disk = dict()
+
+    # parse the output to only return the values we want to keep
+    try:
+        old_location = dict(
+            Address=on_disk['Address'],
+            Altitude=on_disk['Altitude'],
+            GoogleMap=on_disk['GoogleMap'],
+            LastLocationRun=on_disk['LastLocationRun'],
+            Latitude=on_disk['Latitude'],
+            LatitudeAccuracy=on_disk['LatitudeAccuracy'],
+            Longitude=on_disk['Longitude'],
+            LongitudeAccuracy=on_disk['LongitudeAccuracy'],
+        )
+    except KeyError:
+        old_location = dict()
+    return old_location
 
 def mac_has_wireless():
     """Check to see if this Mac has a wireless NIC. If it doesn't the
@@ -226,16 +263,17 @@ def service_handler(action):
 def sysprefs_boxchk():
     """Enables location services in sysprefs globally."""
     uuid = get_hardware_uuid()
-    perfdir = "/private/var/db/locationd/Library/Preferences/ByHost/"
-    if not os.path.exists(perfdir):
+    prefdir = "/private/var/db/locationd/Library/Preferences/ByHost/"
+    if not os.path.exists(prefdir):
         logging.debug("Locationd preference directory not present. Creating now.")
-        os.makedirs(perfdir)
+        os.makedirs(prefdir)
     path_stub = "/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd."
     das_plist = path_stub + uuid.strip() + ".plist"
     logging.info("Read current locationd settings")
     try:
         on_disk = FoundationPlist.readPlist(das_plist)
-    except:
+    except (AttributeError,
+            FoundationPlist.NSPropertyListSerializationException):
         p = {}
         FoundationPlist.writePlist(p, das_plist)
         logging.debug("Creating empty locationd preferences")
@@ -266,12 +304,13 @@ def add_python():
     das_plist = '/private/var/db/locationd/clients.plist'
     try:
         clients_dict = FoundationPlist.readPlist(das_plist)
-    except:
+    except (AttributeError,
+            FoundationPlist.NSPropertyListSerializationException):
         p = {}
         FoundationPlist.writePlist(p, das_plist)
         clients_dict = FoundationPlist.readPlist(das_plist)
     val = clients_dict.get(domain, None)
-    logging.debug("Current client.plist is: ")
+    logging.debug("Current location domain of client.plist is: ")
     logging.debug(val)
     need_to_run = False
     try:
@@ -293,7 +332,7 @@ def add_python():
         service_handler('load')
         logging.debug("Process a lookup so locationd service can properly authorize "
                       "python for your OS.")
-        lookup(8)
+        lookup(1)
         service_handler('unload')
         clients_dict = FoundationPlist.readPlist(das_plist)
         auth_plist = clients_dict[domain]
@@ -301,6 +340,10 @@ def add_python():
         FoundationPlist.writePlist(clients_dict, das_plist)
         os.chown(das_plist, 205, 205)
         service_handler('load')
+        clients_dict = FoundationPlist.readPlist(das_plist)
+        val = clients_dict.get(domain, None)
+        logging.debug("Current location domain of client.plist is now: ")
+        logging.debug(val)
         logging.info("Location Services was enabled. "
                      "We are waiting 30 seconds before doing a lookup.")
         sleep(30)
@@ -345,7 +388,7 @@ class MyLocationManagerDelegate(NSObject):
         global plist
         plist = dict(
             Altitude=int(altitude),
-            CurrentStatus="Successful",
+            CurrentStatus=str("Successful"),
             GoogleMap=str(gmap),
             LastLocationRun=str(time),
             Latitude=str(lat),
@@ -370,9 +413,7 @@ class MyLocationManagerDelegate(NSObject):
             status = "Location Services Disabled"
 
         global plist
-        plist = dict(
-            CurrentStatus="Unsuccessful: " + status,
-        )
+        plist = dict(CurrentStatus=str("Unsuccessful: " + status),)
         logging.info("Lookup request failed")
         logging.debug("Unsuccessful lookup request: %s", status)
 
@@ -483,7 +524,7 @@ def main():
         os_check()
         if mac_has_wireless() is False:
             status = "No wireless interface found."
-            write_to_cache_location(None, status)
+            write_to_cache_location(None, status, None)
             logging.warn(status)
             exit(0)
         root_check()
@@ -491,25 +532,27 @@ def main():
         add_python()
         if check_wait_period(override):
             update_check_time()
+            past_loc = retrieve_past_location()
             if pref('EnableWireless'):
                 enable_wireless()
             if wireless_status() == 'Off':
                 status = "Wireless interface is turned off."
-                write_to_cache_location(None, status)
+                write_to_cache_location(None, status, past_loc)
                 logging.warn(status)
                 exit(0)
             lookup(8)
             address_lookup('google')
             try:
                 global plist
-                write_to_cache_location(plist, plist['CurrentStatus'])
+                status = plist['CurrentStatus']
+                write_to_cache_location(plist, status, past_loc)
                 logging.info("Current location: %s, %s", plist['Latitude'], plist['Longitude'])
                 logging.info("Run status: %s", plist['CurrentStatus'])
             except KeyError:
                 status = ("Error obtaining a location. LS was unresponsive "
                           "or a lookup timeout occurred.")
                 logging.warn(status)
-                write_to_cache_location(plist, status)
+                write_to_cache_location(plist, status, past_loc)
 
 if __name__ == '__main__':
     main()
