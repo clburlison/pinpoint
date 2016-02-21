@@ -45,11 +45,15 @@ plist = dict()
 # Retrieve system UUID
 IOKit_bundle = NSBundle.bundleWithIdentifier_('com.apple.framework.IOKit')
 
+# Disable PyLint undefined variable checks
+# pylint: disable=E0602
 functions = [("IOServiceGetMatchingService", b"II@"),
              ("IOServiceMatching", b"@*"),
              ("IORegistryEntryCreateCFProperty", b"@I@@I"),
             ]
 
+# objc objects do not contain 'members' that Python expect
+# pylint: disable=E1101
 objc.loadBundleFunctions(IOKit_bundle, globals(), functions)
 objc.loadBundle('CoreWLAN',
                 bundle_path='/System/Library/Frameworks/CoreWLAN.framework',
@@ -171,7 +175,7 @@ def write_to_cache_location(data, status):
         plist = data
     base_stats = dict(
         CurrentStatus=str(status),
-        LastRun=current_time(),
+        LastRun=str(current_time()),
         LS_Enabled=is_enabled,
     )
     plist.update(base_stats)
@@ -307,6 +311,9 @@ def add_python():
 is_enabled = CLLocationManager.locationServicesEnabled()
 is_authorized = CLLocationManager.authorizationStatus()
 
+# Disable PyLints unused argument check as the NSObject
+# requires the arguments even if we do not use them.
+# pylint: disable=W0613
 class MyLocationManagerDelegate(NSObject):
     """CoreLocation delegate for handling location lookups. This class
     is required for python to properly start/stop lookups with location
@@ -346,7 +353,7 @@ class MyLocationManagerDelegate(NSObject):
             Longitude=str(lon),
             LongitudeAccuracy=int(horAcc),
         )
-        logging.debug("Successful lookup request: %s, %s", 
+        logging.debug("Successful lookup request: %s, %s",
                       plist['Latitude'], plist['Longitude'])
     def locationManager_didFailWithError_(self, manager, err):
         """Handlers errors for location manager."""
@@ -368,6 +375,8 @@ class MyLocationManagerDelegate(NSObject):
         )
         logging.info("Lookup request failed")
         logging.debug("Unsuccessful lookup request: %s", status)
+
+# pylint: enable=W0613
 
 def lookup(lookupTime):
     """Ask python to find current location."""
