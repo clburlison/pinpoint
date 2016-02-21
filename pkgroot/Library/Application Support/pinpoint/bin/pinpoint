@@ -424,10 +424,26 @@ class MyLocationManagerDelegate(NSObject):
 
 # pylint: enable=W0613
 
-def lookup(lookupTime):
+def lookup(time=None):
     """Ask python to find current location."""
-    finder = MyLocationManagerDelegate.alloc().init()
-    NSRunLoop.currentRunLoop().runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(lookupTime))
+    if time == 1:
+        finder = MyLocationManagerDelegate.alloc().init()
+        NSRunLoop.currentRunLoop().runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
+    else:
+        time = 5
+        # Run 3 loops in an attempt to find a location.
+        # Each loop increases time by 5 seconds.
+        for x in range(3):
+            logging.debug("Running lookup loop: %s", x)
+            finder = MyLocationManagerDelegate.alloc().init()
+            NSRunLoop.currentRunLoop().runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
+            global plist
+            try:
+                if plist['Latitude'] is not None:
+                    break
+            except KeyError:
+                time += 5
+                pass
 
 def download_file(url):
     """Download a simple file from the Internet."""
@@ -545,7 +561,7 @@ def main():
                 write_to_cache_location(None, status, past_loc)
                 logging.warn(status)
                 exit(0)
-            lookup(8)
+            lookup()
             address_lookup('google')
             try:
                 global plist
