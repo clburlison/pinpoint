@@ -8,7 +8,7 @@ A python script for finding your Mac
 Author: Clayton Burlison - https://clburlison.com  
 
 
-#Info
+# Info
 
 This script uses Apple's [CoreLocation framework](https://developer.apple.com/library/ios/documentation/CoreLocation/Reference/CoreLocation_Framework/) to determine the approximate location of your Mac.
 
@@ -24,11 +24,17 @@ After the run pinpoint will write a plist file containing the data from the run.
 
 More information can be found on the [Wiki](https://github.com/clburlison/pinpoint/wiki).
 
-#Legal Notice
-_coming soon_
+# Legal Notice
+> pinpoint should only be installed on devices that you have authorization to do so on. Data collected from this project is directly uploaded to Apple, Inc. and Google, Inc. via geocoding APIs for in order to locate your Mac. 
+>
+> Usage of this project for illegal or immoral activities is deeply frowned upon. These activities could have consequences including fines and jail time depending on your location. I in no way endorse the usage of this project for these acts.
+
+I am not a lawyer and all questions regarding the legality of this project within a specific organization should be taken up with a real lawyer.
 
 
-#Credits
+
+
+# Credits
 Based off of works by:  
 
 | Author  |  Project Link |
