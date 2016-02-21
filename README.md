@@ -3,7 +3,7 @@ pinpoint
 
 ![pinpoint logo](/support_files/pinpoint-logo-wide.png)
 
-A python script for finding your Mac
+A python script for finding your Mac.
 
 Author: Clayton Burlison - https://clburlison.com  
 

@@ -27,14 +27,12 @@ from CoreLocation import CLLocationManager, kCLDistanceFilterNone, kCLLocationAc
 from Foundation import NSRunLoop, NSDate, NSObject, NSBundle
 from Foundation import CFPreferencesAppSynchronize
 from Foundation import CFPreferencesCopyAppValue
-# from Foundation import CFPreferencesCopyKeyList
 from Foundation import CFPreferencesSetValue
 from Foundation import kCFPreferencesAnyUser
-# from Foundation import kCFPreferencesCurrentUser
 from Foundation import kCFPreferencesCurrentHost
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -85,13 +83,6 @@ def os_check():
         write_to_cache_location(None, status)
         exit(0)
 
-def reload_prefs():
-    """Uses CFPreferencesAppSynchronize(BUNDLE_ID)
-    to make sure we have the latest prefs. Call this
-    if you have modified /Library/Preferences/com.clburlison.pinpoint.plist
-    """
-    CFPreferencesAppSynchronize(BUNDLE_ID)
-
 def set_pref(pref_name, pref_value):
     """Sets a preference, writing it to
     /Library/Preferences/com.clburlison.pinpoint.plist.
@@ -123,7 +114,7 @@ def pref(pref_name):
     if pref_value is None:
         pref_value = default_prefs.get(pref_name)
         # we're using a default value. We'll write it out to
-        # /Library/Preferences/<BUNDLE_ID>.plist for admin
+        # /Library/Preferences/com.clburlison.pinpoint.plist for admin
         # discoverability
         set_pref(pref_name, pref_value)
     return pref_value
@@ -136,8 +127,9 @@ def current_time():
 
 def check_wait_period(override):
     """Limit the amount of lookups a computer will run.
-    We want to use this in conjunction with out LaunchDaemon to
-    make sure we always have updated data available."""
+    We want to use this in conjunction with our LaunchDaemon to
+    make sure we always have updated data available without
+    going over API limits."""
 
     # If we pass an override, skip this check
     if override:
@@ -207,7 +199,7 @@ def wireless_status():
         proc = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE)
         wifi_power = (proc.communicate()[0].replace('\n', '')
                       .split(":")[1].replace(' ', ''))
-        logging.debug("Wireless adapter is currently: %s",
+        logging.debug("Wireless interface is currently: %s",
                       wifi_power)
         return wifi_power
 
@@ -222,7 +214,7 @@ def enable_wireless():
 
 def service_handler(action):
     """Loads/unloads System's location services launchd job."""
-    logging.debug("%s locationd service", action)
+    logging.debug("Currently %sing locationd service", action)
     launchctl = ['/bin/launchctl', action,
                  '/System/Library/LaunchDaemons/com.apple.locationd.plist']
     subprocess.check_output(launchctl)
@@ -232,7 +224,7 @@ def sysprefs_boxchk():
     uuid = get_hardware_uuid()
     perfdir = "/private/var/db/locationd/Library/Preferences/ByHost/"
     if not os.path.exists(perfdir):
-        logging.info("locationd preference directory not present")
+        logging.debug("Locationd preference directory not present. Creating now.")
         os.makedirs(perfdir)
     path_stub = "/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd."
     das_plist = path_stub + uuid.strip() + ".plist"
@@ -242,7 +234,7 @@ def sysprefs_boxchk():
     except:
         p = {}
         FoundationPlist.writePlist(p, das_plist)
-        logging.debug("creating empty locationd preferences")
+        logging.debug("Creating empty locationd preferences")
         on_disk = FoundationPlist.readPlist(das_plist)
     val = on_disk.get('LocationServicesEnabled', None)
     if val != 1:
@@ -274,9 +266,9 @@ def add_python():
         p = {}
         FoundationPlist.writePlist(p, das_plist)
         clients_dict = FoundationPlist.readPlist(das_plist)
-    logging.debug("Current client.plist is: ")
-    logging.debug(clients_dict)
     val = clients_dict.get(domain, None)
+    logging.debug("Current client.plist is: ")
+    logging.debug(val)
     need_to_run = False
     try:
         if val["Authorized"] != True:
@@ -288,14 +280,14 @@ def add_python():
 
     # El Capital added a cdhash requirement that is difficult to calculate. As such we are allowing
     # the system to correctly input the values and then giving Python access to LS.
-    if need_to_run is True:
-        logging.info("we need to authorize python")
+    if need_to_run:
+        logging.info("We need to authorize python")
         service_handler('unload')
         clients_dict[domain] = auth_plist
         FoundationPlist.writePlist(clients_dict, das_plist)
         os.chown(das_plist, 205, 205)
         service_handler('load')
-        logging.debug("process a lookup so locationd service can properly authorize "
+        logging.debug("Process a lookup so locationd service can properly authorize "
                       "python for your OS.")
         lookup(8)
         service_handler('unload')
@@ -342,19 +334,20 @@ class MyLocationManagerDelegate(NSObject):
         gmap = ("http://www.google.com/maps/place/" + str(lat) + "," + str(lon) +
                 "/@" + str(lat) + "," + str(lon) + ",18z/data=!3m1!1e3")
 
-        logging.info("process a lookup request")
+        logging.info("Process a lookup request")
         global plist
         plist = dict(
-            Latitude=str(lat),
-            Longitude=str(lon),
-            LatitudeAccuracy=int(verAcc),
-            LongitudeAccuracy=int(horAcc),
             Altitude=int(altitude),
-            GoogleMap=str(gmap),
             CurrentStatus="Successful",
+            GoogleMap=str(gmap),
+            LastLocationRun=str(time),
+            Latitude=str(lat),
+            LatitudeAccuracy=int(verAcc),
+            Longitude=str(lon),
+            LongitudeAccuracy=int(horAcc),
         )
-        logging.debug("output from successful lookup request: ")
-        logging.debug(plist)
+        logging.debug("Successful lookup request: %s, %s", 
+                      plist['Latitude'], plist['Longitude'])
     def locationManager_didFailWithError_(self, manager, err):
         """Handlers errors for location manager."""
         if is_enabled is True:
@@ -373,9 +366,8 @@ class MyLocationManagerDelegate(NSObject):
         plist = dict(
             CurrentStatus="Unsuccessful: " + status,
         )
-        logging.info("lookup request failed")
-        logging.debug("output from failed lookup request: ")
-        logging.debug(plist)
+        logging.info("Lookup request failed")
+        logging.debug("Unsuccessful lookup request: %s", status)
 
 def lookup(lookupTime):
     """Ask python to find current location."""
@@ -384,13 +376,13 @@ def lookup(lookupTime):
 
 def download_file(url):
     """Download a simple file from the Internet."""
-    logging.info("download json address file from Google")
+    logging.info("Download json address file from Google")
     try:
         temp_file = os.path.join(tempfile.mkdtemp(), 'tempdata')
         f = urlopen(url)
         with open(temp_file, "wb") as local_file:
             local_file.write(f.read())
-        logging.info("download successful")
+        logging.info("Download successful")
     except HTTPError, e:
         logging.debug("HTTP Error: %s, %s", e.code, url)
     except URLError, e:
