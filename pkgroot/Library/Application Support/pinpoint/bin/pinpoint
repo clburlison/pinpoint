@@ -7,6 +7,7 @@ by default.
 """
 
 import os
+import sys
 import plistlib
 import platform
 import subprocess
@@ -32,7 +33,7 @@ from Foundation import kCFPreferencesAnyUser
 from Foundation import kCFPreferencesCurrentHost
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '0.0.3'
+__version__ = '0.0.3.1'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -41,6 +42,10 @@ BUNDLE_ID = 'com.clburlison.pinpoint'
 # pylint: disable=C0103
 # Create global plist object for data storage
 plist = dict()
+
+# To resolve unicode write errors set our default encoding to utf8
+reload(sys)
+sys.setdefaultencoding('utf8')
 
 # Retrieve system UUID
 IOKit_bundle = NSBundle.bundleWithIdentifier_('com.apple.framework.IOKit')
