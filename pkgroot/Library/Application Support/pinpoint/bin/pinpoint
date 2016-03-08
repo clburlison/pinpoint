@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# encoding: utf-8
 """
 Enables location services (LS),
 gives Python access to location services,
@@ -7,7 +8,6 @@ by default.
 """
 
 import os
-import sys
 import plistlib
 import platform
 import subprocess
@@ -42,10 +42,6 @@ BUNDLE_ID = 'com.clburlison.pinpoint'
 # pylint: disable=C0103
 # Create global plist object for data storage
 plist = dict()
-
-# To resolve unicode write errors set our default encoding to utf8
-reload(sys)
-sys.setdefaultencoding('utf8')
 
 # Retrieve system UUID
 IOKit_bundle = NSBundle.bundleWithIdentifier_('com.apple.framework.IOKit')
@@ -184,7 +180,7 @@ def write_to_cache_location(data, status, past_loc):
     if data is not None:
         plist = data
     if past_loc is not None:
-        stale_record = dict(StaleLocation=str('Yes'),)
+        stale_record = dict(StaleLocation=str('Yes'))
     base_stats = dict(
         CurrentStatus=str(status),
         LastRun=str(current_time()),
@@ -423,7 +419,7 @@ class MyLocationManagerDelegate(NSObject):
             status = "Location Services Disabled"
 
         global plist
-        plist = dict(CurrentStatus=str("Unsuccessful: " + status),)
+        plist = dict(CurrentStatus=str("Unsuccessful: " + status))
         logging.info("Lookup request failed")
         logging.debug("Unsuccessful lookup request: %s", status)
 
@@ -508,7 +504,8 @@ def address_lookup(service):
         address = 'Address lookup has been disabled on this computer.'
 
     # update plist with the address data
-    add = dict(Address=str(address),)
+    add = dict(Address=address)
+    logging.debug("Address is: %s", address)
     plist.update(add)
 
 def main():
