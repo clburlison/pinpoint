@@ -10,6 +10,8 @@ Author: Clayton Burlison - https://clburlison.com
 
 # Info
 
+:bangbang: Munkireport users [read this](https://github.com/clburlison/pinpoint/wiki/MunkiReport-Setup)! :bangbang:
+
 This script uses Apple's [CoreLocation framework](https://developer.apple.com/library/ios/documentation/CoreLocation/Reference/CoreLocation_Framework/) to determine the approximate location of your Mac.
 
 Limited to **10.8 - 10.11**. 
