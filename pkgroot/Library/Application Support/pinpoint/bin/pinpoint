@@ -114,6 +114,7 @@ def pref(pref_name):
         'CacheDir': '/Library/Application Support/pinpoint',
         'CheckWaitTime': 1800,
         'EnableWireless': False,
+        'DisableWireless': False,
     }
     pref_value = CFPreferencesCopyAppValue(pref_name, BUNDLE_ID)
     if pref_value is None:
@@ -251,13 +252,28 @@ def wireless_status():
         return wifi_power
 
 def enable_wireless():
-    """Enable the wireless adapter."""
+    """Enable the wireless adapter. Return True if we made a change."""
     wifi_power = wireless_status()
     if wifi_power == 'Off':
         iface = CWInterface.interface()
         iface.setPower_error_(True, None)
         logging.debug("Wireless adapter has been turned on.")
         sleep(5)
+        return True
+    else:
+        return False
+
+def disable_wireless():
+    """Disable the wireless adapter. Return True if we made a change."""
+    wifi_power = wireless_status()
+    if wifi_power == 'On':
+        iface = CWInterface.interface()
+        iface.setPower_error_(False, None)
+        logging.debug("Wireless adapter has been turned off.")
+        sleep(5)
+        return True
+    else:
+        return False
 
 def service_handler(action):
     """Loads/unloads System's location services launchd job."""
@@ -556,8 +572,11 @@ def main():
         if check_wait_period(override):
             update_check_time()
             past_loc = retrieve_past_location()
+            # Only enable the wireless adapter if the preference key is True
             if pref('EnableWireless'):
-                enable_wireless()
+                WirelessOutput = enable_wireless()
+            else:
+                WirelessOutput = False
             if wireless_status() == 'Off':
                 status = "Wireless interface is turned off."
                 write_to_cache_location(None, status, past_loc)
@@ -565,6 +584,11 @@ def main():
                 exit(0)
             lookup()
             address_lookup('google')
+            # Only disable the wireless adapter if the preference key is True
+            # and pinpoint earlier enabled wireless
+            if pref('DisableWireless'):
+                if WirelessOutput:
+                    WirelessOutput = disable_wireless()
             try:
                 global plist
                 status = plist['CurrentStatus']
