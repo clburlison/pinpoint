@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Autoversion updater for pinpoint largely based off of:
+#  https://github.com/munkireport/munkireport-php/blob/master/build/git/post-commit
+
+VERSION_FILE=$(git rev-parse --show-toplevel)"/pkgroot/Library/Application Support/pinpoint/bin/pinpoint"
+COMMIT_COUNT=$(git rev-list HEAD --count)
+
+# This is a post_commit hook, so we up the count with one
+COMMIT_COUNT=$(( $COMMIT_COUNT + 1 ))
+
+# Replace last part of the version number with the commit count
+sed -i .bak "s/\(\__version__\ = '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.\)[0-9][0-9]*/\1$COMMIT_COUNT/" "$VERSION_FILE"
+rm "$VERSION_FILE".bak

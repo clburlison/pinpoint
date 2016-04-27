@@ -1,7 +1,7 @@
 # Makefile for pinpoint related tasks
 
 PKGTITLE="pinpoint"
-PKGVERSION="0.0.4"
+PKGVERSION:=$(shell ./pkgroot/Library/Application\ Support/pinpoint/bin/pinpoint --version)
 PKGID=com.clburlison.pinpoint
 PROJECT="pinpoint"
 
