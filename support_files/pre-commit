@@ -12,3 +12,6 @@ COMMIT_COUNT=$(( $COMMIT_COUNT + 1 ))
 # Replace last part of the version number with the commit count
 sed -i .bak "s/\(\__version__\ = '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.\)[0-9][0-9]*/\1$COMMIT_COUNT/" "$VERSION_FILE"
 rm "$VERSION_FILE".bak
+
+# Always add the pinpoint script as it keeps track of our version
+git add "$VERSION_FILE"

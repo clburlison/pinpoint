@@ -36,7 +36,7 @@ from Foundation import kCFPreferencesAnyUser
 from Foundation import kCFPreferencesCurrentHost
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '0.0.4.42'
+__version__ = '0.0.4.44'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
