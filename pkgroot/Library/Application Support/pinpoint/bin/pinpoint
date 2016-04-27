@@ -490,7 +490,7 @@ def run_script(pathname, scripttype, timeout_sec=10):
                 timeout = {"value": False}
                 timer = Timer(timeout_sec, kill_proc, [proc, timeout])
                 timer.start()
-                logging.info('Processing %s', pathname)
+                logging.info('Processing %s...', scripttype)
                 (stdout, stderr) = proc.communicate()
                 timer.cancel()
                 if timeout["value"] is True:
@@ -500,6 +500,8 @@ def run_script(pathname, scripttype, timeout_sec=10):
                                  'still ran successfully: %s', pathname, stderr)
                 elif proc.returncode > 0:
                     logging.warn('Failure processing %s: %s', pathname, stderr)
+                elif proc.returncode == 0:
+                    logging.info('Successfully processed %s ', scripttype)
                 return proc.returncode, stdout.decode("utf-8", 'replace'), \
                                         stderr.decode("utf-8", 'replace'), \
                                         timeout["value"]
