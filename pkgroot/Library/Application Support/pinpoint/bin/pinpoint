@@ -15,9 +15,12 @@ import tempfile
 import argparse
 import logging
 import json
+import shlex
+from threading import Timer
 from urllib2 import urlopen, URLError, HTTPError
 from datetime import datetime, timedelta
 from time import gmtime, strftime, sleep
+from stat import S_IXOTH, S_IWOTH
 import objc
 import FoundationPlist
 
@@ -462,6 +465,53 @@ def lookup(time=None):
                 time += 5
                 pass
 
+# Borrowed from Outset - Joe Chilcote
+def check_perms(pathname):
+    mode = os.stat(pathname).st_mode
+    owner = os.stat(pathname).st_uid
+    if owner == 0 and (mode & S_IXOTH) and not (mode & S_IWOTH):
+        return True
+    else:
+        return False
+
+def kill_proc(proc, timeout):
+    timeout["value"] = True
+    proc.kill()
+
+# Borrowed from Outset - Joe Chilcote
+def run_script(pathname, scripttype, timeout_sec=10):
+    """Runs script located at given pathname"""
+    if os.path.exists(pathname):
+        if check_perms(pathname):
+            try:
+                proc = subprocess.Popen(pathname, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                timeout = {"value": False}
+                timer = Timer(timeout_sec, kill_proc, [proc, timeout])
+                timer.start()
+                logging.info('Processing %s', pathname)
+                (stdout, stderr) = proc.communicate()
+                if timeout["value"] is True:
+                    logging.warn('Script timed out while processing %s', pathname)
+                if stderr and proc.returncode == 0:
+                    logging.info('Output from %s on stderr but it '
+                                 'still ran successfully: %s', pathname, stderr)
+                elif proc.returncode > 0:
+                    logging.warn('Failure processing %s: %s', pathname, stderr)
+                return proc.returncode, stdout.decode("utf-8", 'replace'), \
+                                        stderr.decode("utf-8", 'replace'), \
+                                        timeout["value"]
+            except OSError as err:
+                logging.warn('Failure processing %s: %s', pathname, err)
+                return False
+            finally:
+                timer.cancel()
+        else:
+            logging.warn('Bad permissions: %s', pathname)
+            return False
+    else:
+        logging.debug('No %s script on disk', scripttype)
+        return True
+
 def download_file(url):
     """Download a simple file from the Internet."""
     logging.info("Download json address file from Google")
@@ -582,13 +632,15 @@ def main():
                 write_to_cache_location(None, status, past_loc)
                 logging.warn(status)
                 exit(0)
+
+            # Run the preflight script if it exists and has good perms
+            preflightscript = os.path.join(cachedir, 'preflight')
+            result = run_script(preflightscript, 'preflight')
+            # we ignore the result of the preflight
+
             lookup()
             address_lookup('google')
-            # Only disable the wireless adapter if the preference key is True
-            # and pinpoint earlier enabled wireless
-            if pref('DisableWireless'):
-                if WirelessOutput:
-                    WirelessOutput = disable_wireless()
+
             try:
                 global plist
                 status = plist['CurrentStatus']
@@ -600,6 +652,17 @@ def main():
                           "or a lookup timeout occurred.")
                 logging.warn(status)
                 write_to_cache_location(plist, status, past_loc)
+
+            # Run the postflight script if it exists and has good perms
+            postflightscript = os.path.join(cachedir, 'postflight')
+            result = run_script(postflightscript, 'postflight')
+            # we ignore the result of the postflight
+
+            # Only disable the wireless adapter if the preference key is True
+            # and pinpoint earlier enabled wireless
+            if pref('DisableWireless'):
+                if WirelessOutput:
+                    WirelessOutput = disable_wireless()
 
 if __name__ == '__main__':
     main()
