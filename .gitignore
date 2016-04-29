@@ -3,3 +3,4 @@ tmp/
 .pyc
 *.pkg
 *.dmg
+examples/pinpoint-script/pkgroot/*
