@@ -27,7 +27,9 @@ import FoundationPlist
 # PyLint cannot properly find names inside Cocoa libraries, so issues bogus
 # No name 'Foo' in module 'Bar' warnings. Disable them.
 # pylint: disable=E0611
-from CoreLocation import CLLocationManager, kCLDistanceFilterNone, kCLLocationAccuracyBest
+from CoreLocation import CLLocationManager
+from CoreLocation import kCLDistanceFilterNone
+from CoreLocation import kCLLocationAccuracyBest
 from Foundation import NSRunLoop, NSDate, NSObject, NSBundle
 from Foundation import CFPreferencesAppSynchronize
 from Foundation import CFPreferencesCopyAppValue
@@ -36,7 +38,7 @@ from Foundation import kCFPreferencesAnyUser
 from Foundation import kCFPreferencesCurrentHost
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '0.0.5.47'
+__version__ = '0.0.5.48'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -54,7 +56,7 @@ IOKit_bundle = NSBundle.bundleWithIdentifier_('com.apple.framework.IOKit')
 functions = [("IOServiceGetMatchingService", b"II@"),
              ("IOServiceMatching", b"@*"),
              ("IORegistryEntryCreateCFProperty", b"@I@@I"),
-            ]
+             ]
 
 # objc objects do not contain 'members' that Python expect
 # pylint: disable=E1101
@@ -63,14 +65,17 @@ objc.loadBundle('CoreWLAN',
                 bundle_path='/System/Library/Frameworks/CoreWLAN.framework',
                 module_globals=globals())
 
+
 def io_key(keyname):
     """Pythonic function to retrieve system info without a subprocess call."""
-    return IORegistryEntryCreateCFProperty(IOServiceGetMatchingService(0, \
+    return IORegistryEntryCreateCFProperty(IOServiceGetMatchingService(0,
            IOServiceMatching("IOPlatformExpertDevice")), keyname, None, 0)
+
 
 def get_hardware_uuid():
     """Returns the system UUID."""
     return io_key("IOPlatformUUID")
+
 
 def root_check():
     """Check for root access."""
@@ -78,18 +83,22 @@ def root_check():
         logging.warn("You must run this as root!")
         exit(0)
 
+
 def os_vers():
     """Retrieve OS version."""
     maj_os_vers = platform.mac_ver()[0].split('.')[1]
     return maj_os_vers
 
+
 def os_check():
     """Only tested on 10.8 - 10.11."""
     if not 8 <= int(os_vers()) <= 11:
-        status = "Your OS is not supported at this time: %s" % platform.mac_ver()[0]
+        status = "Your OS is not supported at this time: %s" % (
+            platform.mac_ver()[0])
         logging.warn(status)
         write_to_cache_location(None, status, None)
         exit(0)
+
 
 def set_pref(pref_name, pref_value):
     """Sets a preference, writing it to
@@ -104,6 +113,7 @@ def set_pref(pref_name, pref_value):
         CFPreferencesAppSynchronize(BUNDLE_ID)
     except BaseException:
         pass
+
 
 def pref(pref_name):
     """Return a preference. Since this uses CFPreferencesCopyAppValue,
@@ -128,11 +138,13 @@ def pref(pref_name):
         set_pref(pref_name, pref_value)
     return pref_value
 
+
 def current_time():
     """Prints current date/time stamp"""
     timeFormat = "%Y-%m-%d %H:%M:%S +0000"
     now = strftime(timeFormat, gmtime())
     return now
+
 
 def check_wait_period(override):
     """Limit the amount of lookups a computer will run.
@@ -165,6 +177,7 @@ def check_wait_period(override):
     except TypeError:
         return True
 
+
 def convert_date_type(strDate):
     """Convert date string type to date type."""
     try:
@@ -172,11 +185,13 @@ def convert_date_type(strDate):
     except TypeError:
         pass
 
+
 def update_check_time():
     """Record last check time"""
     now = current_time()
     logging.debug("Updating 'LastCheckDate' timestamp")
     set_pref('LastCheckDate', now)
+
 
 def write_to_cache_location(data, status, past_loc):
     """Method to write plist data to disk"""
@@ -205,6 +220,7 @@ def write_to_cache_location(data, status, past_loc):
                   output_file)
     plistlib.writePlist(plist, output_file)
 
+
 def retrieve_past_location():
     """Return the past location from the on disk plist."""
     output_file = os.path.join(pref('CacheDir'), "location.plist")
@@ -231,11 +247,13 @@ def retrieve_past_location():
         old_location = dict()
     return old_location
 
+
 def mac_has_wireless():
     """Check to see if this Mac has a wireless NIC. If it doesn't the
     CoreLocation lookup will fail."""
     iface_name = CWInterface.interfaceNames()
     return True if iface_name else False
+
 
 def wireless_status():
     """Determine current power state for wireless adapter."""
@@ -254,6 +272,7 @@ def wireless_status():
                       wifi_power)
         return wifi_power
 
+
 def enable_wireless():
     """Enable the wireless adapter. Return True if we made a change."""
     wifi_power = wireless_status()
@@ -265,6 +284,7 @@ def enable_wireless():
         return True
     else:
         return False
+
 
 def disable_wireless():
     """Disable the wireless adapter. Return True if we made a change."""
@@ -278,12 +298,14 @@ def disable_wireless():
     else:
         return False
 
+
 def service_handler(action):
     """Loads/unloads System's location services launchd job."""
     logging.debug("Currently %sing locationd service", action)
     launchctl = ['/bin/launchctl', action,
                  '/System/Library/LaunchDaemons/com.apple.locationd.plist']
     subprocess.check_output(launchctl)
+
 
 def sysprefs_boxchk():
     """Enables location services in sysprefs globally."""
@@ -315,6 +337,7 @@ def sysprefs_boxchk():
     else:
         logging.info("Location Services are enabled")
 
+
 def add_python():
     """Python dict for clients.plist in locationd settings."""
     auth_plist = {}
@@ -339,15 +362,16 @@ def add_python():
     logging.debug(val)
     need_to_run = False
     try:
-        if val["Authorized"] != True:
+        if val["Authorized"] is not True:
             need_to_run = True
     except TypeError:
         need_to_run = True
     except KeyError:
         need_to_run = True
 
-    # El Capital added a cdhash requirement that is difficult to calculate. As such we are allowing
-    # the system to correctly input the values and then giving Python access to LS.
+    # El Capital added a cdhash requirement that is difficult to calculate.
+    # As such we are allowing the system to correctly input the values and
+    # then giving Python access to LS.
     if need_to_run:
         logging.info("We need to authorize python")
         service_handler('unload')
@@ -355,8 +379,8 @@ def add_python():
         FoundationPlist.writePlist(clients_dict, das_plist)
         os.chown(das_plist, 205, 205)
         service_handler('load')
-        logging.debug("Process a lookup so locationd service can properly authorize "
-                      "python for your OS.")
+        logging.debug("Process a lookup so locationd service can properly "
+                      "authorize python for your OS.")
         lookup(1)
         service_handler('unload')
         clients_dict = FoundationPlist.readPlist(das_plist)
@@ -379,6 +403,7 @@ def add_python():
 is_enabled = CLLocationManager.locationServicesEnabled()
 is_authorized = CLLocationManager.authorizationStatus()
 
+
 # Disable PyLints unused argument check as the NSObject
 # requires the arguments even if we do not use them.
 # pylint: disable=W0613
@@ -398,6 +423,7 @@ class MyLocationManagerDelegate(NSObject):
         self.locationManager.setDesiredAccuracy_(kCLLocationAccuracyBest)
         self.locationManager.startUpdatingLocation()
         return self
+
     def locationManager_didUpdateToLocation_fromLocation_(self, manager, newloc, oldloc):
         """Splits location data into separate pieces for processing later."""
         lat = newloc.coordinate().latitude
@@ -423,6 +449,7 @@ class MyLocationManagerDelegate(NSObject):
         )
         logging.debug("Successful lookup request: %s, %s",
                       plist['Latitude'], plist['Longitude'])
+
     def locationManager_didFailWithError_(self, manager, err):
         """Handlers errors for location manager."""
         if is_enabled is True:
@@ -443,6 +470,7 @@ class MyLocationManagerDelegate(NSObject):
         logging.debug("Unsuccessful lookup request: %s", status)
 
 # pylint: enable=W0613
+
 
 def lookup(time=None):
     """Ask python to find current location."""
@@ -465,6 +493,7 @@ def lookup(time=None):
                 time += 5
                 pass
 
+
 # Borrowed from Outset - Joe Chilcote
 def check_perms(pathname):
     mode = os.stat(pathname).st_mode
@@ -474,9 +503,11 @@ def check_perms(pathname):
     else:
         return False
 
+
 def kill_proc(proc, timeout):
     timeout["value"] = True
     proc.kill()
+
 
 # Borrowed from Outset - Joe Chilcote
 def run_script(pathname, scripttype, timeout_sec=10):
@@ -484,9 +515,10 @@ def run_script(pathname, scripttype, timeout_sec=10):
     if os.path.exists(pathname):
         if check_perms(pathname):
             try:
-                proc = subprocess.Popen(pathname, shell=False,
-                                                  stdout=subprocess.PIPE, 
-                                                  stderr=subprocess.PIPE)
+                proc = subprocess.Popen(pathname,
+                                        shell=False,
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE)
                 timeout = {"value": False}
                 timer = Timer(timeout_sec, kill_proc, [proc, timeout])
                 timer.start()
@@ -515,6 +547,7 @@ def run_script(pathname, scripttype, timeout_sec=10):
         logging.debug('No %s script on disk', scripttype)
         return True
 
+
 def download_file(url):
     """Download a simple file from the Internet."""
     logging.info("Download json address file from Google")
@@ -541,6 +574,7 @@ def download_file(url):
     except (OSError, IOError):
         pass
     return data
+
 
 def address_lookup(service):
     """Resolve coordinates to a street address."""
@@ -577,22 +611,27 @@ def address_lookup(service):
     logging.debug("Address is: %s", address)
     plist.update(add)
 
+
 def main():
     """Main method for handling options."""
     parser = argparse.ArgumentParser(prog='pinpoint',
-                                     description='This script will attempt to locate your mac.')
+                                     description='This script will attempt to '
+                                     'locate your mac.')
     parser.add_argument('--auto', action='store_true', default=True,
-                        help='Used by the LaunchDaemon to find your mac in the background.')
+                        help='Used by the LaunchDaemon to find your mac in '
+                        'the background.')
     parser.add_argument('-v', '--verbose', action='count', default=0,
-                        help='More verbose output. May be specified multiple times.')
+                        help='More verbose output. May be specified multiple '
+                        'times.')
     parser.add_argument('-f', '--force', action='store_true',
-                        help='Force the location lookup run disregarding last check time.')
+                        help='Force the location lookup run disregarding '
+                        'last check time.')
     parser.add_argument('-V', '--version', action='store_true',
                         help='Print script version')
     args = parser.parse_args()
 
     levels = [logging.WARN, logging.INFO, logging.DEBUG]
-    level = levels[min(len(levels)-1, args.verbose)]  # capped to number of levels
+    level = levels[min(len(levels)-1, args.verbose)]  # capped logging to 3
 
     logging.basicConfig(level=level,
                         format="%(levelname)s: %(message)s")
@@ -648,7 +687,8 @@ def main():
                 global plist
                 status = plist['CurrentStatus']
                 write_to_cache_location(plist, status, past_loc)
-                logging.info("Current location: %s, %s", plist['Latitude'], plist['Longitude'])
+                logging.info("Current location: %s, %s",
+                             plist['Latitude'], plist['Longitude'])
                 logging.info("Run status: %s", plist['CurrentStatus'])
             except KeyError:
                 status = ("Error obtaining a location. LS was unresponsive "
