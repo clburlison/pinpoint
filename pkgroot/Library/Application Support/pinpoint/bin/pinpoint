@@ -38,7 +38,7 @@ from Foundation import kCFPreferencesAnyUser
 from Foundation import kCFPreferencesCurrentHost
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '0.0.5.49'
+__version__ = '0.0.5.50'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -68,8 +68,9 @@ objc.loadBundle('CoreWLAN',
 
 def io_key(keyname):
     """Pythonic function to retrieve system info without a subprocess call."""
-    return IORegistryEntryCreateCFProperty(IOServiceGetMatchingService(0,
-           IOServiceMatching("IOPlatformExpertDevice")), keyname, None, 0)
+    return IORegistryEntryCreateCFProperty(
+           IOServiceGetMatchingService(0, IOServiceMatching(
+            "IOPlatformExpertDevice")), keyname, None, 0)
 
 
 def get_hardware_uuid():
@@ -163,8 +164,9 @@ def check_wait_period(override):
     last_run_time = convert_date_type(LastCheckDate)
 
     if CheckWaitTime < 900:
-        logging.warn("Your current CheckWaitTime value of '%s' might not run", CheckWaitTime)
-        logging.warn("as often as you wish due to the LaunchDaemon running pinpoint.")
+        logging.warn("Your current CheckWaitTime value of {0} might not run\n"
+                     "as often as you wish due to the LaunchDaemon running"
+                     "pinpoint.".format(CheckWaitTime))
 
     try:
         future_run_time = last_run_time + timedelta(seconds=CheckWaitTime)
@@ -312,10 +314,10 @@ def sysprefs_boxchk():
     uuid = get_hardware_uuid()
     prefdir = "/private/var/db/locationd/Library/Preferences/ByHost/"
     if not os.path.exists(prefdir):
-        logging.debug("Locationd preference directory not present. Creating now.")
+        logging.debug("Locationd pref directory not present. Creating now.")
         os.makedirs(prefdir)
-    path_stub = "/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd."
-    das_plist = path_stub + uuid.strip() + ".plist"
+    das_plist = ("/private/var/db/locationd/Library/Preferences"
+                 "/ByHost/com.apple.locationd.{0}.plist".format(uuid.strip()))
     logging.info("Read current locationd settings")
     try:
         on_disk = FoundationPlist.readPlist(das_plist)
@@ -424,7 +426,8 @@ class MyLocationManagerDelegate(NSObject):
         self.locationManager.startUpdatingLocation()
         return self
 
-    def locationManager_didUpdateToLocation_fromLocation_(self, manager, newloc, oldloc):
+    def locationManager_didUpdateToLocation_fromLocation_(self, manager,
+                                                          newloc, oldloc):
         """Splits location data into separate pieces for processing later."""
         lat = newloc.coordinate().latitude
         lon = newloc.coordinate().longitude
@@ -475,7 +478,8 @@ def lookup(time=None):
     """Ask python to find current location."""
     if time == 1:
         finder = MyLocationManagerDelegate.alloc().init()
-        NSRunLoop.currentRunLoop().runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
+        NSRunLoop.currentRunLoop().\
+            runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
     else:
         time = 5
         # Run 3 loops in an attempt to find a location.
@@ -483,7 +487,8 @@ def lookup(time=None):
         for x in range(3):
             logging.debug("Running lookup loop: %s", x)
             finder = MyLocationManagerDelegate.alloc().init()
-            NSRunLoop.currentRunLoop().runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
+            NSRunLoop.currentRunLoop().\
+                runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
             global plist
             try:
                 if plist['Latitude'] is not None:
@@ -525,17 +530,20 @@ def run_script(pathname, scripttype, timeout_sec=10):
                 (stdout, stderr) = proc.communicate()
                 timer.cancel()
                 if timeout["value"] is True:
-                    logging.warn('Script timed out while processing %s', pathname)
+                    logging.warn('Script timed out while processing {0}'.
+                                 format(pathname))
                 if stderr and proc.returncode == 0:
-                    logging.info('Output from %s on stderr but it '
-                                 'still ran successfully: %s', pathname, stderr)
+                    logging.info('Output from {0} on stderr but it '
+                                 'still ran successfully: {1}'.
+                                 format(pathname, stderr))
                 elif proc.returncode > 0:
                     logging.warn('Failure processing %s: %s', pathname, stderr)
                 elif proc.returncode == 0:
                     logging.info('Successfully processed %s ', scripttype)
-                return proc.returncode, stdout.decode("utf-8", 'replace'), \
-                                        stderr.decode("utf-8", 'replace'), \
-                                        timeout["value"]
+                return proc.returncode,
+                stdout.decode("utf-8", 'replace'),
+                stderr.decode("utf-8", 'replace'),
+                timeout["value"]
             except (OSError, IOError) as err:
                 logging.warn('Failure processing %s: %s', pathname, err)
                 return False
@@ -578,7 +586,7 @@ def download_file(url):
 def address_lookup(service):
     """Resolve coordinates to a street address."""
     global plist
-    google_api_url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng='
+    api_url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng='
     if pref('AddressLookup'):
         try:
             if plist['Latitude']:
@@ -586,7 +594,7 @@ def address_lookup(service):
                 lon = plist['Longitude']
                 if service == 'google':
                     try:
-                        url = '%s%s,%s' % (google_api_url, lat, lon)
+                        url = '%s%s,%s' % (api_url, lat, lon)
                         data = download_file(url)
                         obj = json.loads(data)
                         address = obj["results"][0]["formatted_address"]
@@ -594,7 +602,8 @@ def address_lookup(service):
                         address = 'Google reverse lookup failed.'
                         logging.warn(address)
                 elif service == 'apple':
-                    address = 'Apple reverse lookup not supported at this time.'
+                    address = ('Apple reverse lookup not supported'
+                               'at this time.')
                     logging.warn(address)
                 else:
                     address = 'Unsupported address lookup service: ' + service
