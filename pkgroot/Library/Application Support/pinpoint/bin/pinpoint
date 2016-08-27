@@ -38,7 +38,7 @@ from Foundation import kCFPreferencesAnyUser
 from Foundation import kCFPreferencesCurrentHost
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '0.0.5.48'
+__version__ = '0.0.5.49'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -432,9 +432,8 @@ class MyLocationManagerDelegate(NSObject):
         horAcc = newloc.horizontalAccuracy()
         altitude = newloc.altitude()
         time = newloc.timestamp()
-        gmap = ("http://www.google.com/maps/place/" + str(lat) + "," + str(lon) +
-                "/@" + str(lat) + "," + str(lon) + ",18z/data=!3m1!1e3")
-
+        gmap = (r"http://www.google.com/maps/place/{0},{1},"
+                "/@{0},{1},18z/data=!3m1!1e3".format(str(lat), str(lon)))
         logging.info("Process a lookup request")
         global plist
         plist = dict(
