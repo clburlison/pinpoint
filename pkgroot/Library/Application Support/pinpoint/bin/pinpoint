@@ -43,7 +43,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.0.54'
+__version__ = '1.0.0.55'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -58,7 +58,7 @@ def set_pref(pref_name, pref_value):
     """Sets a preference, writing it to
     /Library/Preferences/com.clburlison.pinpoint.plist.
     This should normally be used only for 'bookkeeping' values;
-    values that control the behavior of munki may be overridden
+    values that control the behavior of pinpoint may be overridden
     elsewhere (by MCX, for example)"""
     try:
         CFPreferencesSetValue(
