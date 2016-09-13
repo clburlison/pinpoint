@@ -43,7 +43,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.0.53'
+__version__ = '1.0.0.54'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -52,6 +52,46 @@ BUNDLE_ID = 'com.clburlison.pinpoint'
 # pylint: disable=C0103
 # Create global plist object for data storage
 plist = dict()
+
+
+def set_pref(pref_name, pref_value):
+    """Sets a preference, writing it to
+    /Library/Preferences/com.clburlison.pinpoint.plist.
+    This should normally be used only for 'bookkeeping' values;
+    values that control the behavior of munki may be overridden
+    elsewhere (by MCX, for example)"""
+    try:
+        CFPreferencesSetValue(
+            pref_name, pref_value, BUNDLE_ID,
+            kCFPreferencesAnyUser, kCFPreferencesCurrentHost)
+        CFPreferencesAppSynchronize(BUNDLE_ID)
+    except BaseException:
+        pass
+
+
+def pref(pref_name):
+    """Return a preference. Since this uses CFPreferencesCopyAppValue,
+    Preferences can be defined several places. Precedence is:
+        - MCX/profile
+        - /Library/Preferences/com.clburlison.pinpoint.plist
+        - default_prefs defined here.
+    """
+    default_prefs = {
+        'AddressLookup': True,
+        'AddressLookupService': "apple",
+        'CacheDir': '/Library/Application Support/pinpoint',
+        'CheckWaitTime': 1800,
+        'EnableWireless': False,
+        'DisableWireless': False,
+    }
+    pref_value = CFPreferencesCopyAppValue(pref_name, BUNDLE_ID)
+    if pref_value is None:
+        pref_value = default_prefs.get(pref_name)
+        # we're using a default value. We'll write it out to
+        # /Library/Preferences/com.clburlison.pinpoint.plist for admin
+        # discoverability
+        set_pref(pref_name, pref_value)
+    return pref_value
 
 
 def get_hardware_uuid():
@@ -95,46 +135,6 @@ def os_check():
         logging.warn(status)
         write_to_cache_location(None, status, None)
         exit(0)
-
-
-def set_pref(pref_name, pref_value):
-    """Sets a preference, writing it to
-    /Library/Preferences/com.clburlison.pinpoint.plist.
-    This should normally be used only for 'bookkeeping' values;
-    values that control the behavior of munki may be overridden
-    elsewhere (by MCX, for example)"""
-    try:
-        CFPreferencesSetValue(
-            pref_name, pref_value, BUNDLE_ID,
-            kCFPreferencesAnyUser, kCFPreferencesCurrentHost)
-        CFPreferencesAppSynchronize(BUNDLE_ID)
-    except BaseException:
-        pass
-
-
-def pref(pref_name):
-    """Return a preference. Since this uses CFPreferencesCopyAppValue,
-    Preferences can be defined several places. Precedence is:
-        - MCX/profile
-        - /Library/Preferences/com.clburlison.pinpoint.plist
-        - default_prefs defined here.
-    """
-    default_prefs = {
-        'AddressLookup': True,
-        'AddressLookupService': "apple",
-        'CacheDir': '/Library/Application Support/pinpoint',
-        'CheckWaitTime': 1800,
-        'EnableWireless': False,
-        'DisableWireless': False,
-    }
-    pref_value = CFPreferencesCopyAppValue(pref_name, BUNDLE_ID)
-    if pref_value is None:
-        pref_value = default_prefs.get(pref_name)
-        # we're using a default value. We'll write it out to
-        # /Library/Preferences/com.clburlison.pinpoint.plist for admin
-        # discoverability
-        set_pref(pref_name, pref_value)
-    return pref_value
 
 
 def current_time():
@@ -195,6 +195,7 @@ def update_check_time():
 def write_to_cache_location(data, status, past_loc):
     """Method to write plist data to disk"""
     global plist
+    is_enabled = CLLocationManager.locationServicesEnabled()
     if data is not None:
         plist = data
     if past_loc is not None:
@@ -245,65 +246,6 @@ def retrieve_past_location():
     except KeyError:
         old_location = dict()
     return old_location
-
-
-class wireless(object):
-    # objc objects do not contain 'members' that Python expect
-    # pylint: disable=E1101
-    bundle_path = '/System/Library/Frameworks/CoreWLAN.framework'
-    IOKit_bundle = NSBundle.bundleWithIdentifier_(
-        'com.apple.framework.IOKit')
-    functions = [("IOServiceGetMatchingService", b"II@"),
-                 ("IOServiceMatching", b"@*"),
-                 ("IORegistryEntryCreateCFProperty", b"@I@@I"), ]
-    objc.loadBundleFunctions(IOKit_bundle, globals(), functions)
-    objc.loadBundle('CoreWLAN',
-                    bundle_path=bundle_path,
-                    module_globals=globals())
-
-    def mac_has_wireless(self):
-        """Check to see if this Mac has a wireless NIC. If it doesn't the
-        CoreLocation lookup will fail."""
-        iface_name = CWInterface.interfaceNames()
-        return True if iface_name else False
-
-    def wireless_status(self):
-        """Determine current power state for wireless adapter."""
-        iface_name = CWInterface.interfaceNames()
-        # This handles a case where we have no wireless interface
-        # and the return value is None
-        if iface_name:
-            # The first interface can be assumed to be the airport card
-            iface_name = iface_name.itervalues().next()
-            command = ['/usr/sbin/networksetup', '-getairportpower',
-                       iface_name]
-            proc = subprocess.Popen(command, stdout=subprocess.PIPE)
-            wifi_power = (proc.communicate()[0].replace('\n', '')
-                          .split(":")[1].replace(' ', ''))
-            logging.debug("Wireless interface is currently: %s",
-                          wifi_power)
-            return wifi_power
-
-    def toggle_wireless(self, value):
-        """Toggle the wireless adapter. Takes argument of value as:
-        'on' to enable or 'off' to disable wireless.
-        Return True if we made a change."""
-        wifi_power = self.wireless_status()
-        iface = CWInterface.interface()
-        value = value.lower()
-        if value == "on":
-            setPower = True
-        if value == "off":
-            setPower = False
-        if (wifi_power == 'Off' and value == "on") or (
-            wifi_power == 'On' and value == "off"
-        ):
-            iface.setPower_error_(setPower, None)
-            logging.debug("Wireless adapter has been turned %s.", value)
-            sleep(5)
-            return True
-        else:
-            return False
 
 
 def service_handler(action):
@@ -406,9 +348,149 @@ def add_python():
     else:
         logging.info("Python is enabled")
 
-# Access CoreLocation framework to locate Mac
-is_enabled = CLLocationManager.locationServicesEnabled()
-is_authorized = CLLocationManager.authorizationStatus()
+
+def lookup(time=None):
+    """Ask python to find current location."""
+    if time == 1:
+        # pylint: disable=W0612
+        finder = MyLocationManagerDelegate.alloc().init()
+        NSRunLoop.currentRunLoop().\
+            runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
+    else:
+        time = 5
+        # Run 3 loops in an attempt to find a location.
+        # Each loop increases time by 5 seconds.
+        for x in range(3):
+            logging.debug("Running lookup loop: %s", x)
+            finder = MyLocationManagerDelegate.alloc().init()
+            NSRunLoop.currentRunLoop().\
+                runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
+            global plist
+            try:
+                if plist['Latitude'] is not None:
+                    break
+            except KeyError:
+                time += 5
+
+
+class script_runner():
+    """Functions for running a script safely in the context of root."""
+    # Borrowed from Outset - Joe Chilcote
+    def check_perms(self, pathname):
+        """Check permissions of script before running to verify only root
+        has access."""
+        mode = os.stat(pathname).st_mode
+        owner = os.stat(pathname).st_uid
+        if owner == 0 and (mode & S_IXOTH) and not (mode & S_IWOTH):
+            return True
+        else:
+            return False
+
+    def kill_proc(self, proc, timeout):
+        """Function to stop processes if they've gone rogue."""
+        timeout["value"] = True
+        proc.kill()
+
+    def run_script(self, pathname, scripttype, timeout_sec=10):
+        """Runs script located at given pathname"""
+        if os.path.exists(pathname):
+            if self.check_perms(pathname):
+                try:
+                    proc = subprocess.Popen(pathname,
+                                            shell=False,
+                                            stdout=subprocess.PIPE,
+                                            stderr=subprocess.PIPE)
+                    timeout = {"value": False}
+                    timer = Timer(timeout_sec, self.kill_proc, [proc, timeout])
+                    timer.start()
+                    logging.info('Processing %s...', scripttype)
+                    (stdout, stderr) = proc.communicate()
+                    timer.cancel()
+                    if timeout["value"] is True:
+                        logging.warn('Script timed out while processing {0}'.
+                                     format(pathname))
+                    if stderr and proc.returncode == 0:
+                        logging.info('Output from {0} on stderr but it '
+                                     'still ran successfully: {1}'.
+                                     format(pathname, stderr))
+                    elif proc.returncode > 0:
+                        logging.warn('Failure processing %s: %s',
+                                     pathname, stderr)
+                    elif proc.returncode == 0:
+                        logging.info('Successfully processed %s ', scripttype)
+                    return proc.returncode,
+                    stdout.decode("utf-8", 'replace'),
+                    stderr.decode("utf-8", 'replace'),
+                    timeout["value"]
+                except (OSError, IOError) as err:
+                    logging.warn('Failure processing %s: %s', pathname, err)
+                    return False
+            else:
+                logging.warn('Bad permissions: %s', pathname)
+                return False
+        else:
+            logging.debug('No %s script on disk', scripttype)
+            return True
+
+
+class wireless(object):
+    """All functions related to our Mac's wireless."""
+    # objc objects do not contain 'members' that Python expect
+    # pylint: disable=E1101
+    bundle_path = '/System/Library/Frameworks/CoreWLAN.framework'
+    IOKit_bundle = NSBundle.bundleWithIdentifier_(
+        'com.apple.framework.IOKit')
+    functions = [("IOServiceGetMatchingService", b"II@"),
+                 ("IOServiceMatching", b"@*"),
+                 ("IORegistryEntryCreateCFProperty", b"@I@@I"), ]
+    objc.loadBundleFunctions(IOKit_bundle, globals(), functions)
+    objc.loadBundle('CoreWLAN',
+                    bundle_path=bundle_path,
+                    module_globals=globals())
+
+    def mac_has_wireless(self):
+        """Check to see if this Mac has a wireless NIC. If it doesn't the
+        CoreLocation lookup will fail."""
+        iface_name = CWInterface.interfaceNames()
+        return True if iface_name else False
+
+    def wireless_status(self):
+        """Determine current power state for wireless adapter."""
+        iface_name = CWInterface.interfaceNames()
+        # This handles a case where we have no wireless interface
+        # and the return value is None
+        if iface_name:
+            # The first interface can be assumed to be the airport card
+            iface_name = iface_name.itervalues().next()
+            command = ['/usr/sbin/networksetup', '-getairportpower',
+                       iface_name]
+            proc = subprocess.Popen(command, stdout=subprocess.PIPE)
+            wifi_power = (proc.communicate()[0].replace('\n', '')
+                          .split(":")[1].replace(' ', ''))
+            logging.debug("Wireless interface is currently: %s",
+                          wifi_power)
+            return wifi_power
+
+    def toggle_wireless(self, value):
+        """Toggle the wireless adapter. Takes argument of value as:
+        'on' to enable or 'off' to disable wireless.
+        Return True if we made a change."""
+        wifi_power = self.wireless_status()
+        iface = CWInterface.interface()
+        value = value.lower()
+        if value == "on":
+            setPower = True
+        if value == "off":
+            setPower = False
+        if (wifi_power == 'Off' and value == "on") or (
+            wifi_power == 'On' and value == "off"
+        ):
+            iface.setPower_error_(setPower, None)
+            logging.debug("Wireless adapter has been turned %s.", value)
+            sleep(5)
+            return True
+        else:
+            return False
 
 
 # Disable PyLints unused argument check as the NSObject
@@ -417,8 +499,10 @@ is_authorized = CLLocationManager.authorizationStatus()
 class MyLocationManagerDelegate(NSObject):
     """CoreLocation delegate for handling location lookups. This class
     is required for python to properly start/stop lookups with location
-    services.
-    """
+    services."""
+    is_authorized = CLLocationManager.authorizationStatus()
+    is_enabled = CLLocationManager.locationServicesEnabled()
+
     def init(self):
         """Define location manager settings for lookups."""
         self = super(MyLocationManagerDelegate, self).init()
@@ -459,14 +543,14 @@ class MyLocationManagerDelegate(NSObject):
 
     def locationManager_didFailWithError_(self, manager, err):
         """Handlers errors for location manager."""
-        if is_enabled is True:
-            if is_authorized == 3:
+        if self.is_enabled is True:
+            if self.is_authorized == 3:
                 status = "Unable to locate"
-            if is_authorized == 2:
+            if self.is_authorized == 2:
                 status = "Denied"
-            if is_authorized == 1:
+            if self.is_authorized == 1:
                 status = "Restricted"
-            if is_authorized == 0:
+            if self.is_authorized == 0:
                 status = "Not Determined"
         else:
             status = "Location Services Disabled"
@@ -479,91 +563,9 @@ class MyLocationManagerDelegate(NSObject):
 # pylint: enable=W0613
 
 
-def lookup(time=None):
-    """Ask python to find current location."""
-    if time == 1:
-        # pylint: disable=W0612
-        finder = MyLocationManagerDelegate.alloc().init()
-        NSRunLoop.currentRunLoop().\
-            runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
-    else:
-        time = 5
-        # Run 3 loops in an attempt to find a location.
-        # Each loop increases time by 5 seconds.
-        for x in range(3):
-            logging.debug("Running lookup loop: %s", x)
-            finder = MyLocationManagerDelegate.alloc().init()
-            NSRunLoop.currentRunLoop().\
-                runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
-            global plist
-            try:
-                if plist['Latitude'] is not None:
-                    break
-            except KeyError:
-                time += 5
-
-
-# Borrowed from Outset - Joe Chilcote
-def check_perms(pathname):
-    """Check permissions of script before running to verify only root
-    has access."""
-    mode = os.stat(pathname).st_mode
-    owner = os.stat(pathname).st_uid
-    if owner == 0 and (mode & S_IXOTH) and not (mode & S_IWOTH):
-        return True
-    else:
-        return False
-
-
-def kill_proc(proc, timeout):
-    """Function to stop processes if they've gone rogue."""
-    timeout["value"] = True
-    proc.kill()
-
-
-# Borrowed from Outset - Joe Chilcote
-def run_script(pathname, scripttype, timeout_sec=10):
-    """Runs script located at given pathname"""
-    if os.path.exists(pathname):
-        if check_perms(pathname):
-            try:
-                proc = subprocess.Popen(pathname,
-                                        shell=False,
-                                        stdout=subprocess.PIPE,
-                                        stderr=subprocess.PIPE)
-                timeout = {"value": False}
-                timer = Timer(timeout_sec, kill_proc, [proc, timeout])
-                timer.start()
-                logging.info('Processing %s...', scripttype)
-                (stdout, stderr) = proc.communicate()
-                timer.cancel()
-                if timeout["value"] is True:
-                    logging.warn('Script timed out while processing {0}'.
-                                 format(pathname))
-                if stderr and proc.returncode == 0:
-                    logging.info('Output from {0} on stderr but it '
-                                 'still ran successfully: {1}'.
-                                 format(pathname, stderr))
-                elif proc.returncode > 0:
-                    logging.warn('Failure processing %s: %s', pathname, stderr)
-                elif proc.returncode == 0:
-                    logging.info('Successfully processed %s ', scripttype)
-                return proc.returncode,
-                stdout.decode("utf-8", 'replace'),
-                stderr.decode("utf-8", 'replace'),
-                timeout["value"]
-            except (OSError, IOError) as err:
-                logging.warn('Failure processing %s: %s', pathname, err)
-                return False
-        else:
-            logging.warn('Bad permissions: %s', pathname)
-            return False
-    else:
-        logging.debug('No %s script on disk', scripttype)
-        return True
-
-
 class ReverseLookup(object):
+    """All functions related to doing a reverse lookup request."""
+    # Store our lookup data from Apple's GeoCoder in the following varriable.
     data = None
 
     def download_file(url):
@@ -594,6 +596,7 @@ class ReverseLookup(object):
         return data
 
     def myCompletionHandler(self, placemarks, error):
+        """Completion Handler for Apple's GeoCoder."""
         if error is not None:
             # This is an NSError:
             # Error Domain=kCLErrorDomain Code=2 "(null)" - wifi is off
@@ -611,7 +614,7 @@ class ReverseLookup(object):
         """Resolve coordinates to a street address."""
         global plist
         api_url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng='
-        logging.info("Doing a lookup via: {0}".format(service))
+        logging.info("Doing a reverse lookup via: {0}".format(service))
         if pref('AddressLookup'):
             try:
                 if plist['Latitude']:
@@ -627,9 +630,9 @@ class ReverseLookup(object):
                             address = 'Google reverse lookup failed.'
                             logging.warn(address)
                     elif service == 'apple':
-                        # Since we are storing the lat/lon values as strings
-                        # we must convert them to float before passing to
-                        # Apple's geocoder
+                        # We are storing the lat/lon values as strings
+                        # and must convert them to float before passing to
+                        # Apple's geocoder.
                         location = CLLocation.alloc(
                             ).initWithLatitude_longitude_(
                                 float(lat), float(lon))
@@ -651,7 +654,7 @@ class ReverseLookup(object):
 
         # update plist with the address data
         add = dict(Address=address)
-        logging.debug("Address is: %s", address)
+        logging.info("Address is: %s", address)
         plist.update(add)
 
 
@@ -720,7 +723,7 @@ def main():
 
             # Run the preflight script if it exists and has good perms
             preflightscript = os.path.join(cachedir, 'preflight')
-            result = run_script(preflightscript, 'preflight')
+            result = script_runner().run_script(preflightscript, 'preflight')
             # we ignore the result of the preflight
 
             lookup()
@@ -742,7 +745,7 @@ def main():
 
             # Run the postflight script if it exists and has good perms
             postflightscript = os.path.join(cachedir, 'postflight')
-            result = run_script(postflightscript, 'postflight')
+            result = script_runner().run_script(postflightscript, 'postflight')
             # we ignore the result of the postflight
 
             # Only disable the wireless adapter if the preference key is True
