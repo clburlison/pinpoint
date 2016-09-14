@@ -3,8 +3,8 @@
 """
 Enables location services (LS),
 gives Python access to location services,
-and stores the location of your mac to a plist
-by default.
+and stores the location of your mac to a plist.
+More information at https://github.com/clburlison/pinpoint
 """
 
 import os
@@ -15,7 +15,6 @@ import tempfile
 import argparse
 import logging
 import json
-import shlex
 from threading import Timer
 from urllib2 import urlopen, URLError, HTTPError
 from datetime import datetime, timedelta
@@ -27,18 +26,24 @@ import FoundationPlist
 # PyLint cannot properly find names inside Cocoa libraries, so issues bogus
 # No name 'Foo' in module 'Bar' warnings. Disable them.
 # pylint: disable=E0611
-from CoreLocation import CLLocationManager
-from CoreLocation import kCLDistanceFilterNone
-from CoreLocation import kCLLocationAccuracyBest
-from Foundation import NSRunLoop, NSDate, NSObject, NSBundle
-from Foundation import CFPreferencesAppSynchronize
-from Foundation import CFPreferencesCopyAppValue
-from Foundation import CFPreferencesSetValue
-from Foundation import kCFPreferencesAnyUser
-from Foundation import kCFPreferencesCurrentHost
+from CoreLocation import (CLLocationManager,
+                          CLLocation,
+                          CLGeocoder,
+                          kCLDistanceFilterNone,
+                          kCLLocationAccuracyBest)
+from Foundation import (NSRunLoop,
+                        NSDate,
+                        NSObject,
+                        NSBundle,
+                        CFPreferencesAppSynchronize,
+                        CFPreferencesCopyAppValue,
+                        CFPreferencesSetValue,
+                        kCFPreferencesAnyUser,
+                        kCFPreferencesCurrentHost)
+
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '0.0.5.50'
+__version__ = '0.0.5.51'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -48,34 +53,25 @@ BUNDLE_ID = 'com.clburlison.pinpoint'
 # Create global plist object for data storage
 plist = dict()
 
-# Retrieve system UUID
-IOKit_bundle = NSBundle.bundleWithIdentifier_('com.apple.framework.IOKit')
-
-# Disable PyLint undefined variable checks
-# pylint: disable=E0602
-functions = [("IOServiceGetMatchingService", b"II@"),
-             ("IOServiceMatching", b"@*"),
-             ("IORegistryEntryCreateCFProperty", b"@I@@I"),
-             ]
-
-# objc objects do not contain 'members' that Python expect
-# pylint: disable=E1101
-objc.loadBundleFunctions(IOKit_bundle, globals(), functions)
-objc.loadBundle('CoreWLAN',
-                bundle_path='/System/Library/Frameworks/CoreWLAN.framework',
-                module_globals=globals())
-
-
-def io_key(keyname):
-    """Pythonic function to retrieve system info without a subprocess call."""
-    return IORegistryEntryCreateCFProperty(
-           IOServiceGetMatchingService(0, IOServiceMatching(
-            "IOPlatformExpertDevice")), keyname, None, 0)
-
 
 def get_hardware_uuid():
-    """Returns the system UUID."""
-    return io_key("IOPlatformUUID")
+    '''Get the UUID of the computer'''
+    # IOKit Bundle Objective C code from Michael Lynn
+    # https://gist.github.com/pudquick/c7dd1262bd81a32663f0
+    uuid = ''
+    IOKit_bundle = NSBundle.bundleWithIdentifier_(
+        'com.apple.framework.IOKit')
+    functions = [("IOServiceGetMatchingService", b"II@"),
+                 ("IOServiceMatching", b"@*"),
+                 ("IORegistryEntryCreateCFProperty", b"@I@@I"), ]
+    IOKit = dict()
+    objc.loadBundleFunctions(IOKit_bundle, IOKit, functions)
+    # pylint:disable=F0401, E0602, W0232
+    uuid = IOKit['IORegistryEntryCreateCFProperty'](
+        IOKit['IOServiceGetMatchingService'](
+            0, IOKit['IOServiceMatching'](
+                'IOPlatformExpertDevice')), 'IOPlatformUUID', None, 0)
+    return uuid
 
 
 def root_check():
@@ -250,55 +246,63 @@ def retrieve_past_location():
     return old_location
 
 
-def mac_has_wireless():
-    """Check to see if this Mac has a wireless NIC. If it doesn't the
-    CoreLocation lookup will fail."""
-    iface_name = CWInterface.interfaceNames()
-    return True if iface_name else False
+class wireless(object):
+    # objc objects do not contain 'members' that Python expect
+    # pylint: disable=E1101
+    bundle_path = '/System/Library/Frameworks/CoreWLAN.framework'
+    IOKit_bundle = NSBundle.bundleWithIdentifier_(
+        'com.apple.framework.IOKit')
+    functions = [("IOServiceGetMatchingService", b"II@"),
+                 ("IOServiceMatching", b"@*"),
+                 ("IORegistryEntryCreateCFProperty", b"@I@@I"), ]
+    objc.loadBundleFunctions(IOKit_bundle, globals(), functions)
+    objc.loadBundle('CoreWLAN',
+                    bundle_path=bundle_path,
+                    module_globals=globals())
 
+    def mac_has_wireless(self):
+        """Check to see if this Mac has a wireless NIC. If it doesn't the
+        CoreLocation lookup will fail."""
+        iface_name = CWInterface.interfaceNames()
+        return True if iface_name else False
 
-def wireless_status():
-    """Determine current power state for wireless adapter."""
-    iface_name = CWInterface.interfaceNames()
-    # This handles a case where we have no wireless interface
-    # and the return value is None
-    if iface_name:
-        # The first interface can be assumed to be the airport card
-        iface_name = iface_name.itervalues().next()
-        command = ['/usr/sbin/networksetup', '-getairportpower',
-                   iface_name]
-        proc = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE)
-        wifi_power = (proc.communicate()[0].replace('\n', '')
-                      .split(":")[1].replace(' ', ''))
-        logging.debug("Wireless interface is currently: %s",
-                      wifi_power)
-        return wifi_power
+    def wireless_status(self):
+        """Determine current power state for wireless adapter."""
+        iface_name = CWInterface.interfaceNames()
+        # This handles a case where we have no wireless interface
+        # and the return value is None
+        if iface_name:
+            # The first interface can be assumed to be the airport card
+            iface_name = iface_name.itervalues().next()
+            command = ['/usr/sbin/networksetup', '-getairportpower',
+                       iface_name]
+            proc = subprocess.Popen(command, stdout=subprocess.PIPE)
+            wifi_power = (proc.communicate()[0].replace('\n', '')
+                          .split(":")[1].replace(' ', ''))
+            logging.debug("Wireless interface is currently: %s",
+                          wifi_power)
+            return wifi_power
 
-
-def enable_wireless():
-    """Enable the wireless adapter. Return True if we made a change."""
-    wifi_power = wireless_status()
-    if wifi_power == 'Off':
+    def toggle_wireless(self, value):
+        """Toggle the wireless adapter. Takes argument of value as:
+        'on' to enable or 'off' to disable wireless.
+        Return True if we made a change."""
+        wifi_power = self.wireless_status()
         iface = CWInterface.interface()
-        iface.setPower_error_(True, None)
-        logging.debug("Wireless adapter has been turned on.")
-        sleep(5)
-        return True
-    else:
-        return False
-
-
-def disable_wireless():
-    """Disable the wireless adapter. Return True if we made a change."""
-    wifi_power = wireless_status()
-    if wifi_power == 'On':
-        iface = CWInterface.interface()
-        iface.setPower_error_(False, None)
-        logging.debug("Wireless adapter has been turned off.")
-        sleep(5)
-        return True
-    else:
-        return False
+        value = value.lower()
+        if value == "on":
+            setPower = True
+        if value == "off":
+            setPower = False
+        if (wifi_power == 'Off' and value == "on") or (
+            wifi_power == 'On' and value == "off"
+        ):
+            iface.setPower_error_(setPower, None)
+            logging.debug("Wireless adapter has been turned %s.", value)
+            sleep(5)
+            return True
+        else:
+            return False
 
 
 def service_handler(action):
@@ -477,6 +481,7 @@ class MyLocationManagerDelegate(NSObject):
 def lookup(time=None):
     """Ask python to find current location."""
     if time == 1:
+        # pylint: disable=W0612
         finder = MyLocationManagerDelegate.alloc().init()
         NSRunLoop.currentRunLoop().\
             runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
@@ -495,11 +500,12 @@ def lookup(time=None):
                     break
             except KeyError:
                 time += 5
-                pass
 
 
 # Borrowed from Outset - Joe Chilcote
 def check_perms(pathname):
+    """Check permissions of script before running to verify only root
+    has access."""
     mode = os.stat(pathname).st_mode
     owner = os.stat(pathname).st_uid
     if owner == 0 and (mode & S_IXOTH) and not (mode & S_IWOTH):
@@ -509,6 +515,7 @@ def check_perms(pathname):
 
 
 def kill_proc(proc, timeout):
+    """Function to stop processes if they've gone rogue."""
     timeout["value"] = True
     proc.kill()
 
@@ -661,7 +668,7 @@ def main():
 
     if args.auto:
         os_check()
-        if mac_has_wireless() is False:
+        if wireless().mac_has_wireless() is False:
             status = "No wireless interface found."
             write_to_cache_location(None, status, None)
             logging.warn(status)
@@ -674,10 +681,10 @@ def main():
             past_loc = retrieve_past_location()
             # Only enable the wireless adapter if the preference key is True
             if pref('EnableWireless'):
-                WirelessOutput = enable_wireless()
+                WirelessOutput = wireless().toggle_wireless('on')
             else:
                 WirelessOutput = False
-            if wireless_status() == 'Off':
+            if wireless().wireless_status() == 'Off':
                 status = "Wireless interface is turned off."
                 write_to_cache_location(None, status, past_loc)
                 logging.warn(status)
@@ -713,7 +720,7 @@ def main():
             # and pinpoint earlier enabled wireless
             if pref('DisableWireless'):
                 if WirelessOutput:
-                    WirelessOutput = disable_wireless()
+                    WirelessOutput = wireless().toggle_wireless('off')
 
 if __name__ == '__main__':
     main()
