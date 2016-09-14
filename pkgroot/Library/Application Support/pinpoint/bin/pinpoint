@@ -43,7 +43,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.0.55'
+__version__ = '1.0.0.56'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -95,7 +95,7 @@ def pref(pref_name):
 
 
 def get_hardware_uuid():
-    '''Get the UUID of the computer'''
+    """Get the UUID of the computer"""
     # IOKit Bundle Objective C code from Michael Lynn
     # https://gist.github.com/pudquick/c7dd1262bd81a32663f0
     uuid = ''
