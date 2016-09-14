@@ -43,7 +43,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '0.0.5.51'
+__version__ = '0.0.5.52'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -121,6 +121,7 @@ def pref(pref_name):
     """
     default_prefs = {
         'AddressLookup': True,
+        'AddressLookupService': "apple",
         'CacheDir': '/Library/Application Support/pinpoint',
         'CheckWaitTime': 1800,
         'EnableWireless': False,
@@ -562,69 +563,96 @@ def run_script(pathname, scripttype, timeout_sec=10):
         return True
 
 
-def download_file(url):
-    """Download a simple file from the Internet."""
-    logging.info("Download json address file from Google")
-    try:
-        temp_file = os.path.join(tempfile.mkdtemp(), 'tempdata')
-        f = urlopen(url)
-        with open(temp_file, "wb") as local_file:
-            local_file.write(f.read())
-        logging.info("Download successful")
-    except HTTPError, e:
-        logging.debug("HTTP Error: %s, %s", e.code, url)
-    except URLError, e:
-        logging.debug("URL Error: %s, %s", e.reason, url)
-    try:
-        file_handle = open(temp_file)
-        data = file_handle.read()
-        file_handle.close()
-    except (OSError, IOError):
-        logging.debug("Couldn't read %s", temp_file)
-        return False
-    try:
-        os.unlink(temp_file)
-        os.rmdir(os.path.dirname(temp_file))
-    except (OSError, IOError):
-        pass
-    return data
+class ReverseLookup(object):
+    data = None
 
-
-def address_lookup(service):
-    """Resolve coordinates to a street address."""
-    global plist
-    api_url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng='
-    if pref('AddressLookup'):
+    def download_file(url):
+        """Download a simple file from the Internet."""
+        logging.info("Download json address file from Google")
         try:
-            if plist['Latitude']:
-                lat = plist['Latitude']
-                lon = plist['Longitude']
-                if service == 'google':
-                    try:
-                        url = '%s%s,%s' % (api_url, lat, lon)
-                        data = download_file(url)
-                        obj = json.loads(data)
-                        address = obj["results"][0]["formatted_address"]
-                    except:
-                        address = 'Google reverse lookup failed.'
-                        logging.warn(address)
-                elif service == 'apple':
-                    address = ('Apple reverse lookup not supported'
-                               'at this time.')
-                    logging.warn(address)
-                else:
-                    address = 'Unsupported address lookup service: ' + service
-                    logging.warn(address)
-        except KeyError:
-            address = 'Unable to determine address'
-            logging.warn(address)
-    else:
-        address = 'Address lookup has been disabled on this computer.'
+            temp_file = os.path.join(tempfile.mkdtemp(), 'tempdata')
+            f = urlopen(url)
+            with open(temp_file, "wb") as local_file:
+                local_file.write(f.read())
+            logging.info("Download successful")
+        except HTTPError, e:
+            logging.debug("HTTP Error: %s, %s", e.code, url)
+        except URLError, e:
+            logging.debug("URL Error: %s, %s", e.reason, url)
+        try:
+            file_handle = open(temp_file)
+            data = file_handle.read()
+            file_handle.close()
+        except (OSError, IOError):
+            logging.debug("Couldn't read %s", temp_file)
+            return False
+        try:
+            os.unlink(temp_file)
+            os.rmdir(os.path.dirname(temp_file))
+        except (OSError, IOError):
+            pass
+        return data
 
-    # update plist with the address data
-    add = dict(Address=address)
-    logging.debug("Address is: %s", address)
-    plist.update(add)
+    def myCompletionHandler(self, placemarks, error):
+        if error is not None:
+            # This is an NSError:
+            # Error Domain=kCLErrorDomain Code=2 "(null)" - wifi is off
+            self.data = str(error)
+        elif(placemarks.count() > 0):
+            # Placemarks is a CLPlacemark object. Retrieve the data at index 0
+            # then the convert the formattedAddressLines, which is an NSArray,
+            # into a formated address string.
+            addressAsString = ' '.join(placemarks[0].formattedAddressLines())
+            self.data = addressAsString
+        else:
+            self.data = "Unable to retrevie lookup for unknown reason."
+
+    def address_lookup(self, service):
+        """Resolve coordinates to a street address."""
+        global plist
+        api_url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng='
+        logging.info("Doing a lookup via: {0}".format(service))
+        if pref('AddressLookup'):
+            try:
+                if plist['Latitude']:
+                    lat = plist['Latitude']
+                    lon = plist['Longitude']
+                    if service == 'google':
+                        try:
+                            url = '%s%s,%s' % (api_url, lat, lon)
+                            data = self.download_file(url)
+                            obj = json.loads(data)
+                            address = obj["results"][0]["formatted_address"]
+                        except:
+                            address = 'Google reverse lookup failed.'
+                            logging.warn(address)
+                    elif service == 'apple':
+                        # Since we are storing the lat/lon values as strings
+                        # we must convert them to float before passing to
+                        # Apple's geocoder
+                        location = CLLocation.alloc(
+                            ).initWithLatitude_longitude_(
+                                float(lat), float(lon))
+                        geocoder = CLGeocoder.alloc().init()
+                        geocoder.reverseGeocodeLocation_completionHandler_(
+                            location, self.myCompletionHandler)
+                        NSRunLoop.currentRunLoop().runUntilDate_(
+                            NSDate.dateWithTimeIntervalSinceNow_(3))
+                        address = (self.data)
+                    else:
+                        address = ('Unsupported address lookup service: '
+                                   '{0}'.format(service))
+                        logging.warn(address)
+            except KeyError:
+                address = 'Unable to determine address'
+                logging.warn(address)
+        else:
+            address = 'Address lookup has been disabled on this computer.'
+
+        # update plist with the address data
+        add = dict(Address=address)
+        logging.debug("Address is: %s", address)
+        plist.update(add)
 
 
 def main():
@@ -696,7 +724,8 @@ def main():
             # we ignore the result of the preflight
 
             lookup()
-            address_lookup('google')
+            service = pref('AddressLookupService')
+            ReverseLookup().address_lookup(service)
 
             try:
                 global plist
