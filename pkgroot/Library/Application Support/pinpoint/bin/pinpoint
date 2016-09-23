@@ -17,13 +17,14 @@ import logging
 import logging.handlers
 import json
 import sys
+import re
+import objc
+import FoundationPlist
 from threading import Timer
 from urllib2 import urlopen, URLError, HTTPError
 from datetime import datetime, timedelta
 from time import gmtime, strftime, sleep
 from stat import S_IXOTH, S_IWOTH
-import objc
-import FoundationPlist
 
 # PyLint cannot properly find names inside Cocoa libraries, so issues bogus
 # No name 'Foo' in module 'Bar' warnings. Disable them.
@@ -45,7 +46,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.0.60'
+__version__ = '1.0.0.61'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -407,7 +408,7 @@ def download_file(url):
     return data
 
 
-class script_runner():
+class script_runner(object):
     """Functions for running a script safely in the context of root."""
     # Borrowed from Outset - Joe Chilcote
     def check_perms(self, pathname):
@@ -469,41 +470,27 @@ class script_runner():
 
 class wireless(object):
     """All functions related to our Mac's wireless."""
-    # objc objects do not contain 'members' that Python expect
-    # pylint: disable=E1101
-    bundle_path = '/System/Library/Frameworks/CoreWLAN.framework'
-    IOKit_bundle = NSBundle.bundleWithIdentifier_(
-        'com.apple.framework.IOKit')
-    functions = [("IOServiceGetMatchingService", b"II@"),
-                 ("IOServiceMatching", b"@*"),
-                 ("IORegistryEntryCreateCFProperty", b"@I@@I"), ]
-    objc.loadBundleFunctions(IOKit_bundle, globals(), functions)
-    objc.loadBundle('CoreWLAN',
-                    bundle_path=bundle_path,
-                    module_globals=globals())
-
-    def mac_has_wireless(self):
-        """Check to see if this Mac has a wireless NIC. If it doesn't the
-        CoreLocation lookup will fail."""
-        iface_name = CWInterface.interfaceNames()
-        return True if iface_name else False
+    def get_wireless_interface(self):
+        """Returns the wireless interface device name, (e.g., en0 or en1)."""
+        wireless_interface = None
+        hardware_ports = subprocess.check_output(['/usr/sbin/networksetup',
+                                                  '-listallhardwareports'])
+        match = re.search("(AirPort|Wi-Fi).*?(en\\d)", hardware_ports, re.S)
+        if match:
+            wireless_interface = match.group(2)
+        return wireless_interface
 
     def wireless_status(self):
         """Determine current power state for wireless adapter."""
-        iface_name = CWInterface.interfaceNames()
-        # This handles a case where we have no wireless interface
-        # and the return value is None
-        if iface_name:
-            # The first interface can be assumed to be the airport card
-            iface_name = iface_name.itervalues().next()
-            command = ['/usr/sbin/networksetup', '-getairportpower',
-                       iface_name]
-            proc = subprocess.Popen(command, stdout=subprocess.PIPE)
-            wifi_power = (proc.communicate()[0].replace('\n', '')
-                          .split(":")[1].replace(' ', ''))
-            logging.debug("Wireless interface is currently: %s",
-                          wifi_power)
-            return wifi_power
+        iface_name = self.get_wireless_interface()
+        command = ['/usr/sbin/networksetup', '-getairportpower',
+                   iface_name]
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE)
+        wifi_power = (proc.communicate()[0].replace('\n', '')
+                      .split(":")[1].replace(' ', ''))
+        logging.debug("Wireless interface is currently: %s",
+                      wifi_power)
+        return wifi_power
 
     def toggle_wireless(self, value):
         """Toggle the wireless adapter. Takes argument of value as:
@@ -737,7 +724,7 @@ def main():
 
     if args.auto:
         os_check()
-        if wireless().mac_has_wireless() is False:
+        if wireless().get_wireless_interface() is None:
             status = "No wireless interface found."
             write_to_cache_location(None, status, None)
             logging.warn(status)
