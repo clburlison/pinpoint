@@ -4,6 +4,7 @@ PKGTITLE="pinpoint"
 PKGVERSION:=$(shell ./pkgroot/Library/Application\ Support/pinpoint/bin/pinpoint --version)
 PKGID=com.clburlison.pinpoint
 PROJECT="pinpoint"
+PB_EXTRA_ARGS+= --sign "Developer ID Installer: Clayton Burlison"
 
 #################################################
 
@@ -18,7 +19,7 @@ clean:
 
 ##  pkg - Create a package using pkgbuild
 pkg: clean
-	pkgbuild --root pkgroot --scripts scripts --identifier ${PKGID} --version ${PKGVERSION} --ownership recommended ./${PKGTITLE}-${PKGVERSION}.pkg
+	pkgbuild --root pkgroot --scripts scripts --identifier ${PKGID} ${PB_EXTRA_ARGS} --version ${PKGVERSION} --ownership recommended ./${PKGTITLE}-${PKGVERSION}.pkg
 
 ##  dmg - Wrap the package inside a dmg
 dmg: pkg
