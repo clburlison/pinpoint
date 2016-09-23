@@ -14,7 +14,9 @@ import subprocess
 import tempfile
 import argparse
 import logging
+import logging.handlers
 import json
+import sys
 from threading import Timer
 from urllib2 import urlopen, URLError, HTTPError
 from datetime import datetime, timedelta
@@ -43,7 +45,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.0.56'
+__version__ = '1.0.0.57'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -117,8 +119,8 @@ def get_hardware_uuid():
 def root_check():
     """Check for root access."""
     if not os.geteuid() == 0:
-        logging.warn("You must run this as root!")
-        exit(0)
+        sys.stderr.write("You must run this as root!")
+        exit(1)
 
 
 def os_vers():
@@ -161,9 +163,9 @@ def check_wait_period(override):
     last_run_time = convert_date_type(LastCheckDate)
 
     if CheckWaitTime < 900:
-        logging.warn("Your current CheckWaitTime value of {0} might not run\n"
+        logging.warn("Your current CheckWaitTime value of %s might not run\n"
                      "as often as you wish due to the LaunchDaemon running"
-                     "pinpoint.".format(CheckWaitTime))
+                     "pinpoint.", CheckWaitTime)
 
     try:
         future_run_time = last_run_time + timedelta(seconds=CheckWaitTime)
@@ -171,7 +173,7 @@ def check_wait_period(override):
             return True
         else:
             logging.warn("It is not time to run again! Use '-f' "
-                         "if you wish to force an lookup.")
+                         "if you wish to force a lookup.")
             exit(1)
     except TypeError:
         return True
@@ -407,29 +409,29 @@ class script_runner():
                     (stdout, stderr) = proc.communicate()
                     timer.cancel()
                     if timeout["value"] is True:
-                        logging.warn('Script timed out while processing {0}'.
-                                     format(pathname))
+                        logging.warn("Script timed out while processing %s",
+                                     pathname)
                     if stderr and proc.returncode == 0:
-                        logging.info('Output from {0} on stderr but it '
-                                     'still ran successfully: {1}'.
-                                     format(pathname, stderr))
+                        logging.info("Output from %s on stderr but it "
+                                     "still ran successfully: %s",
+                                     pathname, stderr)
                     elif proc.returncode > 0:
-                        logging.warn('Failure processing %s: %s',
+                        logging.warn("Failure processing %s: %s",
                                      pathname, stderr)
                     elif proc.returncode == 0:
-                        logging.info('Successfully processed %s ', scripttype)
+                        logging.info("Successfully processed %s ", scripttype)
                     return proc.returncode,
                     stdout.decode("utf-8", 'replace'),
                     stderr.decode("utf-8", 'replace'),
                     timeout["value"]
                 except (OSError, IOError) as err:
-                    logging.warn('Failure processing %s: %s', pathname, err)
+                    logging.warn("Failure processing %s: %s", pathname, err)
                     return False
             else:
-                logging.warn('Bad permissions: %s', pathname)
+                logging.warn("Bad permissions: %s", pathname)
                 return False
         else:
-            logging.debug('No %s script on disk', scripttype)
+            logging.debug("No %s script on disk", scripttype)
             return True
 
 
@@ -666,9 +668,9 @@ def main():
     parser.add_argument('--auto', action='store_true', default=True,
                         help='Used by the LaunchDaemon to find your mac in '
                         'the background.')
-    parser.add_argument('-v', '--verbose', action='count', default=0,
-                        help='More verbose output. May be specified multiple '
-                        'times.')
+    parser.add_argument('-v', '--verbose', action='count',
+                        help="Increase verbosity level. Repeatable up to"
+                        "two times.")
     parser.add_argument('-f', '--force', action='store_true',
                         help='Force the location lookup run disregarding '
                         'last check time.')
@@ -676,26 +678,57 @@ def main():
                         help='Print script version')
     args = parser.parse_args()
 
-    levels = [logging.WARN, logging.INFO, logging.DEBUG]
-    level = levels[min(len(levels)-1, args.verbose)]  # capped logging to 3
-
-    logging.basicConfig(level=level,
-                        format="%(levelname)s: %(message)s")
-
-    if args.version:
-        print __version__
-        exit()
+    # Verify we are running as root
+    root_check()
 
     # This is the cache directory where we store our found location
     cachedir = pref('CacheDir')
     if not os.path.exists(cachedir):
         os.makedirs(cachedir)
 
-    # Set default variable values for args
-    override = False
+    # Get root logger and set default logging level
+    rootLogger = logging.getLogger('')
+    rootLogger.setLevel(logging.DEBUG)
+
+    # Write everything to the rotating log file
+    log_dir = os.path.join(cachedir, 'Logs')
+    if not os.path.exists(log_dir):
+        os.mkdir(log_dir)
+    log_file = os.path.join(log_dir, 'pinpoint.log')
+    log_file_handler = logging.handlers.RotatingFileHandler(
+                                filename=log_file,
+                                backupCount=3,
+                                maxBytes=5242880)
+    log_file_format = logging.Formatter(
+                                fmt='%(asctime)s [%(levelname)s]: %(message)s',
+                                datefmt='%Y-%m-%d %I:%M:%S %p')
+    log_file_handler.setFormatter(log_file_format)
+    log_file_handler.setLevel(logging.DEBUG)
+    rootLogger.addHandler(log_file_handler)
+
+    # Log to the console at a level determined by the --verbose flag
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.CRITICAL)
+    console_handler.setFormatter(logging.Formatter(
+        '[%(levelname)s]: %(message)s'))
+    rootLogger.addHandler(console_handler)
+
+    args = parser.parse_args()
+    if not args.verbose:
+        console_handler.setLevel('WARNING')
+    elif args.verbose == 1:
+        console_handler.setLevel('INFO')
+    else:
+        console_handler.setLevel('DEBUG')
+
+    if args.version:
+        print __version__
+        exit()
 
     if args.force:
         override = True
+    else:
+        override = False
 
     if args.auto:
         os_check()
@@ -704,7 +737,6 @@ def main():
             write_to_cache_location(None, status, None)
             logging.warn(status)
             exit(0)
-        root_check()
         sysprefs_boxchk()
         add_python()
         if check_wait_period(override):
