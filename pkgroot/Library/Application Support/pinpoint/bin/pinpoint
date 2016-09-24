@@ -46,7 +46,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.0.63'
+__version__ = '1.0.0.64'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -510,7 +510,8 @@ class script_runner(object):
 class wireless(object):
     """All functions related to our Mac's wireless."""
     def get_wireless_interface(self):
-        """Returns the wireless interface device name, (e.g., en0 or en1)."""
+        """Returns the wireless interface device name or None if
+        no adapter found (e.g., en0 or en1)."""
         wireless_interface = None
         hardware_ports = subprocess.check_output(['/usr/sbin/networksetup',
                                                   '-listallhardwareports'])
@@ -520,7 +521,8 @@ class wireless(object):
         return wireless_interface
 
     def wireless_status(self):
-        """Determine current power state for wireless adapter."""
+        """Determine current power state for wireless adapter.
+        Return 'On' or 'Off'."""
         iface_name = self.get_wireless_interface()
         command = ['/usr/sbin/networksetup', '-getairportpower',
                    iface_name]
