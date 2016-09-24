@@ -46,7 +46,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.0.62'
+__version__ = '1.0.0.63'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -404,7 +404,7 @@ def lookup(service, time=None):
         obj = json.loads(data)
         lat = plist['Latitude'] = obj["location"]["lat"]
         lon = plist['Longitude'] = obj["location"]["lng"]
-        gmap = (r"http://www.google.com/maps/place/{0},{1},"
+        gmap = (r"https://www.google.com/maps/place/{0},{1}"
                 "/@{0},{1},18z/data=!3m1!1e3".format(str(lat), str(lon)))
         logging.info("Process a lookup request via: %s", service)
         plist = dict(
@@ -608,7 +608,7 @@ class MyLocationManagerDelegate(NSObject):
         horAcc = newloc.horizontalAccuracy()
         altitude = newloc.altitude()
         time = newloc.timestamp()
-        gmap = (r"http://www.google.com/maps/place/{0},{1},"
+        gmap = (r"https://www.google.com/maps/place/{0},{1}"
                 "/@{0},{1},18z/data=!3m1!1e3".format(str(lat), str(lon)))
         logging.info("Process a lookup request via: apple")
         global plist
