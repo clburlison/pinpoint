@@ -46,7 +46,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.0.65'
+__version__ = '1.0.0.66'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -80,7 +80,6 @@ def pref(pref_name):
         - default_prefs defined here.
     """
     default_prefs = {
-        'AddressLookup': True,
         'AddressLookupService': 'apple',
         'CacheDir': '/Library/Application Support/pinpoint',
         'CheckWaitTime': 1800,
@@ -674,7 +673,7 @@ class ReverseLookup(object):
         global plist
         api_url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng='
         logging.info("Doing a reverse lookup via: {0}".format(service))
-        if pref('AddressLookup'):
+        if pref('AddressLookupService').lower() != 'none':
             try:
                 if plist['Latitude']:
                     lat = plist['Latitude']
