@@ -46,7 +46,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.0.67'
+__version__ = '1.0.0.68'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -238,13 +238,10 @@ def retrieve_past_location():
     try:
         old_location = dict(
             Address=on_disk['Address'],
-            Altitude=on_disk['Altitude'],
             GoogleMap=on_disk['GoogleMap'],
             LastLocationRun=on_disk['LastLocationRun'],
             Latitude=on_disk['Latitude'],
-            LatitudeAccuracy=on_disk['LatitudeAccuracy'],
             Longitude=on_disk['Longitude'],
-            LongitudeAccuracy=on_disk['LongitudeAccuracy'],
         )
     except KeyError:
         old_location = dict()
@@ -388,6 +385,8 @@ def lookup(service, time=None):
         scan = wireless().wireless_scan()
         api_url = ("https://maps.googleapis.com/maps/api"
                    "/browserlocation/json?browser=firefox")
+
+        # We only send the closet five access points in our api request
         count = 0
         for i, val in enumerate(scan):
             api_url += ('&wifi=mac:{0}&ssid:{1}&ss:{2}'.format(
@@ -398,23 +397,27 @@ def lookup(service, time=None):
             if count == 5:
                 break
 
-        # Add error handling here
         data = download_file(api_url)
-        obj = json.loads(data)
-        lat = plist['Latitude'] = obj["location"]["lat"]
-        lon = plist['Longitude'] = obj["location"]["lng"]
-        gmap = (r"https://www.google.com/maps/place/{0},{1}"
-                "/@{0},{1},18z/data=!3m1!1e3".format(str(lat), str(lon)))
-        logging.info("Process a lookup request via: %s", service)
-        plist = dict(
-            CurrentStatus=str("Successful"),
-            GoogleMap=str(gmap),
-            LastLocationRun=str('TIME HERE'),
-            Latitude=str(lat),
-            Longitude=str(lon),
-        )
-        logging.debug("Successful lookup request: %s, %s",
-                      plist['Latitude'], plist['Longitude'])
+        if data is not False:
+            obj = json.loads(data)
+            lat = plist['Latitude'] = obj["location"]["lat"]
+            lon = plist['Longitude'] = obj["location"]["lng"]
+            gmap = (r"https://www.google.com/maps/place/{0},{1}"
+                    "/@{0},{1},18z/data=!3m1!1e3".format(str(lat), str(lon)))
+            logging.info("Process a lookup request via: %s", service)
+            plist = dict(
+                CurrentStatus=str("Successful"),
+                GoogleMap=str(gmap),
+                LastLocationRun=str(current_time()),
+                Latitude=str(lat),
+                Longitude=str(lon),
+            )
+            logging.debug("Successful lookup request: %s, %s",
+                          plist['Latitude'], plist['Longitude'])
+        else:
+            status = "Google lookup request failed"
+            plist = dict(CurrentStatus=str("Unsuccessful: " + status))
+            logging.warn(status)
 
 
 def download_file(url):
@@ -437,7 +440,6 @@ def download_file(url):
         file_handle.close()
     except (OSError, IOError):
         logging.debug("Couldn't read %s", temp_file)
-        return False
     try:
         os.unlink(temp_file)
         os.rmdir(os.path.dirname(temp_file))
@@ -642,7 +644,7 @@ class MyLocationManagerDelegate(NSObject):
 
         global plist
         plist = dict(CurrentStatus=str("Unsuccessful: " + status))
-        logging.info("Lookup request failed")
+        logging.warn("Apple lookup request failed")
         logging.debug("Unsuccessful lookup request: %s", status)
 
 # pylint: enable=W0613
@@ -841,12 +843,13 @@ def main():
                 global plist
                 status = plist['CurrentStatus']
                 write_to_cache_location(plist, status, past_loc)
-                logging.info("Current location: %s, %s",
-                             plist['Latitude'], plist['Longitude'])
+                if status == "Successful":
+                    logging.info("Current location: %s, %s",
+                                 plist['Latitude'], plist['Longitude'])
                 logging.info("Run status: %s", plist['CurrentStatus'])
             except KeyError:
-                status = ("Error obtaining a location. LS was unresponsive "
-                          "or a lookup timeout occurred.")
+                # status = ("Error obtaining a location. LS was unresponsive "
+                #           "or a lookup timeout occurred.")
                 logging.warn(status)
                 write_to_cache_location(plist, status, past_loc)
 
