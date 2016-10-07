@@ -46,7 +46,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.0.68'
+__version__ = '1.0.0.69'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -740,6 +740,10 @@ def main():
                         help='Print script version')
     args = parser.parse_args()
 
+    if args.version:
+        print __version__
+        exit()
+
     # Verify we are running as root
     root_check()
 
@@ -782,10 +786,6 @@ def main():
         console_handler.setLevel('INFO')
     else:
         console_handler.setLevel('DEBUG')
-
-    if args.version:
-        print __version__
-        exit()
 
     if args.force:
         override = True
