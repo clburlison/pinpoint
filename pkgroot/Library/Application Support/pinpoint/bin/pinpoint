@@ -46,7 +46,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.0.66'
+__version__ = '1.0.0.67'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -730,6 +730,10 @@ def main():
     parser.add_argument('-f', '--force', action='store_true',
                         help='Force the location lookup run disregarding '
                         'last check time.')
+    parser.add_argument('-l', '--lookup', required=False,
+                        help='Override the configured lookup service.')
+    parser.add_argument('-a', '--address', required=False,
+                        help='Override the configured address lookup service.')
     parser.add_argument('-V', '--version', action='store_true',
                         help='Print script version')
     args = parser.parse_args()
@@ -786,6 +790,16 @@ def main():
     else:
         override = False
 
+    if args.lookup:
+        lookup_service = args.lookup.lower()
+    else:
+        lookup_service = pref('LookupService').lower()
+
+    if args.address:
+        address_lookup_service = args.address.lower()
+    else:
+        address_lookup_service = pref('AddressLookupService').lower()
+
     if args.auto:
         os_check()
         if wireless().get_wireless_interface() is None:
@@ -794,9 +808,8 @@ def main():
             logging.warn(status)
             exit(0)
 
-        # Only enable Location Services and Python if the `LookupService` key
+        # Only enable Location Services and Python if the `LookupService`
         # is set to apple.
-        lookup_service = pref('LookupService').lower()
         logging.debug("Current LookupService is: %s", lookup_service)
         if lookup_service == 'apple':
             sysprefs_boxchk()
@@ -820,8 +833,8 @@ def main():
             result = script_runner().run_script(preflightscript, 'preflight')
             # we ignore the result of the preflight
 
+            # Process our lookup and reverse lookup
             lookup(lookup_service)
-            address_lookup_service = pref('AddressLookupService').lower()
             ReverseLookup().address_lookup(address_lookup_service)
 
             try:
