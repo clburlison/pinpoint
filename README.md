@@ -10,7 +10,7 @@ Author: Clayton Burlison - https://clburlison.com
 
 # Info
 
-pinpoint is designed to run in the background to locate your mac on a continuous interval. The benefit to using pinpoint is that is free, and it does all of the enabling automatically it writes the location to disk.
+pinpoint is designed to run in the background to locate your mac on a continuous interval.
 
 Limited to **10.8 - 10.12**.
 
