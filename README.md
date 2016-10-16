@@ -32,10 +32,15 @@ Based off of works by:
 
 | Author  |  Project Link |
 |---|---|
-| [@arubdesu](https://github.com/arubdesu) | https://gist.github.com/arubdesu/b72585771a9f606ad800 |
-| [@pudquick](https://github.com/pudquick) | https://gist.github.com/pudquick/c7dd1262bd81a32663f0 |
-| [@pudquick](https://github.com/pudquick) | https://gist.github.com/pudquick/329142c1740500bd3797 |
-| [@lindes](https://github.com/lindes)   | https://github.com/lindes/get-location/ |
+| [@arubdesu](https://github.com/arubdesu) | [arubdesu/b72585771a9f606ad800](https://gist.github.com/arubdesu/b72585771a9f606ad800) |
+| [@pudquick](https://github.com/pudquick) | [pudquick/c7dd1262bd81a32663f0](https://gist.github.com/pudquick/c7dd1262bd81a32663f0) |
+| [@pudquick](https://github.com/pudquick) | [pudquick/329142c1740500bd3797](https://gist.github.com/pudquick/329142c1740500bd3797) |
+| [@lindes](https://github.com/lindes)     | [lindes/get-location/](https://github.com/lindes/get-location/) |
+| [@chilcote](https://github.com/chilcote) | [chilcote/outset](https://github.com/chilcote/outset/) |
+| [@bollman](https://www.jamf.com/jamf-nation/users/1549/bollman)   | [jamf Nation #12300](https://jamfnation.jamfsoftware.com/discussion.html?id=12300) |
+
+| Organization  |  Project Link |
+|---|---|
 | [University of Utah, Marriott Library](https://github.com/univ-of-utah-marriott-library-apple) | [privacy_services_manager](https://github.com/univ-of-utah-marriott-library-apple/privacy_services_manager) |
 | [Munki](https://github.com/munki) | [FoundationPlist.py](https://github.com/munki/munki/blob/master/code/client/munkilib/FoundationPlist.py) |
 | [Google Inc.](https://github.com/macops) | [supervisor](https://github.com/munki/munki/blob/master/code/client/supervisor) |
