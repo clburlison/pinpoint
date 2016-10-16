@@ -1,9 +1,8 @@
 #!/usr/bin/python
 # encoding: utf-8
 """
-Enables location services (LS),
-gives Python access to location services,
-and stores the location of your mac to a plist.
+pinpoint is a python based script that is able to find the location of your
+Mac using either Apple's or Google's GeoCoding APIs.
 More information at https://github.com/clburlison/pinpoint
 """
 
@@ -46,7 +45,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.0.72'
+__version__ = '1.0.0.73'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -283,23 +282,25 @@ def sysprefs_boxchk():
     bkup_plist = ("/private/var/db/locationd/Library/Preferences"
                   "/ByHost/com.apple.locationd.notbackedup.{0}.plist".format(
                    uuid.strip()))
-    logging.info("Read current locationd settings")
-    try:
-        val = subprocess.check_output(['/usr/bin/defaults', 'read', das_plist,
-                                      'LocationServicesEnabled']).strip()
-    except:
-        val = "0"
-    if val is not "1":
+
+    # Use the offical Apple API for determining location services status
+    ls_status = CLLocationManager.locationServicesEnabled()
+    if ls_status is not True:
         logging.info("Location Services are not enabled")
         service_handler('unload')
         cmd = ['/usr/bin/defaults', 'write', das_plist,
                'LocationServicesEnabled', '-int', '1']
         subprocess.check_output(cmd)
-        cmd = ['/usr/bin/defaults', 'write', bkup_plist,
-               'LocationServicesEnabled', '-int', '1']
-        subprocess.check_output(cmd)
         os.chown(das_plist, 205, 205)
-        os.chown(bkup_plist, 205, 205)
+
+        # 10.12 created a new 'notbackedup' file and although changing it
+        # is not necessarily, we are making the change so it matches Apple's
+        # implementation.
+        if int(os_vers()) <= 12:
+            cmd = ['/usr/bin/defaults', 'write', bkup_plist,
+                   'LocationServicesEnabled', '-int', '1']
+            subprocess.check_output(cmd)
+            os.chown(bkup_plist, 205, 205)
         logging.info("Location Services have been enabled")
         service_handler('load')
     else:
