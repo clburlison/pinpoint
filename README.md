@@ -10,7 +10,7 @@ Author: Clayton Burlison - https://clburlison.com
 
 # Info
 
-pinpoint is designed to run in the background to locate your mac on a continuous interval.
+pinpoint is a python based script that is able to find the location of your Mac using either Apple's or Google's GeoCoding APIs.
 
 Limited to **10.8 - 10.12**.
 
@@ -20,7 +20,7 @@ More information can be found on the [Wiki](https://github.com/clburlison/pinpoi
 
 # Legal Notice
 
-> pinpoint should only be installed on devices that you have authorization to do so on. Data collected from this project is directly uploaded to Apple, Inc. and Google, Inc. via geocoding APIs for in order to locate your Mac.
+> pinpoint should only be installed on devices that you have authorization to do so on. Data collected from this project is directly uploaded to Apple, Inc. and Google, Inc. via GeoCoding APIs for in order to locate your Mac.
 >
 > Usage of this project for illegal or immoral activities is deeply frowned upon. These activities could have consequences including fines and jail time depending on your location. I in no way endorse the usage of this project for these acts.
 
