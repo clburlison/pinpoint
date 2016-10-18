@@ -45,7 +45,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.0.75'
+__version__ = '1.0.0.76'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -296,7 +296,7 @@ def sysprefs_boxchk():
         # 10.12 created a new 'notbackedup' file and although changing it
         # is not necessarily, we are making the change so it matches Apple's
         # implementation.
-        if int(os_vers()) <= 12:
+        if int(os_vers()) >= 12:
             cmd = ['/usr/bin/defaults', 'write', bkup_plist,
                    'LocationServicesEnabled', '-int', '1']
             subprocess.check_output(cmd)
