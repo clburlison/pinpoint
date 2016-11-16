@@ -45,7 +45,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.2.79'
+__version__ = '1.0.2.80'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -294,7 +294,7 @@ def sysprefs_boxchk():
         os.chown(das_plist, 205, 205)
 
         # 10.12 created a new 'notbackedup' file and although changing it
-        # is not necessarily, we are making the change so it matches Apple's
+        # is not necessary, we are making the change so it matches Apple's
         # implementation.
         if int(os_vers()) >= 12:
             cmd = ['/usr/bin/defaults', 'write', bkup_plist,
