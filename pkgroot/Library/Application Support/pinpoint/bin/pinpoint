@@ -45,7 +45,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.2.80'
+__version__ = '1.0.3.81'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -522,6 +522,13 @@ class script_runner(object):
 
 class wireless(object):
     """All functions related to our Mac's wireless."""
+    # required for toggle_wireless however we don't want to load the bundle
+    # twice so we load it here
+    bundle_path = '/System/Library/Frameworks/CoreWLAN.framework'
+    objc.loadBundle('CoreWLAN',
+                    bundle_path=bundle_path,
+                    module_globals=globals())
+
     def get_wireless_interface(self):
         """Returns the wireless interface device name or None if
         no adapter found (e.g., en0 or en1)."""
