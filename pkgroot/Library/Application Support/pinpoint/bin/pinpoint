@@ -45,7 +45,7 @@ from Foundation import (NSRunLoop,
 
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.3.81'
+__version__ = '1.0.3.82'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -732,7 +732,7 @@ class ReverseLookup(object):
             address = 'Address lookup has been disabled on this computer.'
 
         # update plist with the address data
-        add = dict(Address=address)
+        add = dict(Address=str(address))
         logging.info("Address is: %s", address)
         plist.update(add)
 
