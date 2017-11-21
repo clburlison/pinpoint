@@ -6,52 +6,37 @@ Mac using either Apple's or Google's GeoCoding APIs.
 More information at https://github.com/clburlison/pinpoint
 """
 
-import os
-import plistlib
-import platform
-import subprocess
-import tempfile
 import argparse
+import json
 import logging
 import logging.handlers
-import json
-import sys
+import os
+import platform
 import re
-import objc
-import FoundationPlist
-from threading import Timer
-from urllib2 import urlopen, URLError, HTTPError
+import subprocess
+import sys
+import tempfile
 from datetime import datetime, timedelta
-from time import gmtime, strftime, sleep
-from stat import S_IXOTH, S_IWOTH
+from distutils.version import LooseVersion
+from stat import S_IWOTH, S_IXOTH
+from threading import Timer
+from time import gmtime, sleep, strftime
+from urllib2 import HTTPError, URLError, urlopen
 
-# PyLint cannot properly find names inside Cocoa libraries, so issues bogus
-# No name 'Foo' in module 'Bar' warnings. Disable them.
-# pylint: disable=E0611
-from CoreLocation import (CLLocationManager,
-                          CLLocation,
-                          CLGeocoder,
-                          kCLDistanceFilterNone,
-                          kCLLocationAccuracyBest)
-from Foundation import (NSRunLoop,
-                        NSDate,
-                        NSObject,
-                        NSBundle,
-                        CFPreferencesAppSynchronize,
-                        CFPreferencesCopyAppValue,
-                        CFPreferencesSetValue,
-                        kCFPreferencesAnyUser,
-                        kCFPreferencesCurrentHost)
-
+import FoundationPlist
+import objc
+from CoreLocation import (CLGeocoder, CLLocation, CLLocationManager,
+                          kCLDistanceFilterNone, kCLLocationAccuracyBest)
+from Foundation import (CFPreferencesAppSynchronize, CFPreferencesCopyAppValue,
+                        CFPreferencesSetValue, NSDate, NSObject, NSRunLoop,
+                        kCFPreferencesAnyUser, kCFPreferencesCurrentHost)
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '1.0.3.82'
+__version__ = '2.0.0.83'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
 
-# Disable PyLint variable name checks
-# pylint: disable=C0103
 # Create global plist object for data storage
 plist = dict()
 
@@ -96,26 +81,6 @@ def pref(pref_name):
     return pref_value
 
 
-def get_hardware_uuid():
-    """Get the UUID of the computer"""
-    # IOKit Bundle Objective C code from Michael Lynn
-    # https://gist.github.com/pudquick/c7dd1262bd81a32663f0
-    uuid = ''
-    IOKit_bundle = NSBundle.bundleWithIdentifier_(
-        'com.apple.framework.IOKit')
-    functions = [("IOServiceGetMatchingService", b"II@"),
-                 ("IOServiceMatching", b"@*"),
-                 ("IORegistryEntryCreateCFProperty", b"@I@@I"), ]
-    IOKit = dict()
-    objc.loadBundleFunctions(IOKit_bundle, IOKit, functions)
-    # pylint:disable=F0401, E0602, W0232
-    uuid = IOKit['IORegistryEntryCreateCFProperty'](
-        IOKit['IOServiceGetMatchingService'](
-            0, IOKit['IOServiceMatching'](
-                'IOPlatformExpertDevice')), 'IOPlatformUUID', None, 0)
-    return uuid
-
-
 def root_check():
     """Check for root access."""
     if not os.geteuid() == 0:
@@ -125,14 +90,13 @@ def root_check():
 
 def os_vers():
     """Retrieve OS version."""
-    maj_os_vers = platform.mac_ver()[0].split('.')[1]
-    return maj_os_vers
+    return platform.mac_ver()[0]
 
 
 def os_check():
-    """Only tested on 10.8 - 10.12."""
-    if not 8 <= int(os_vers()) <= 12:
-        status = "Your OS is not supported at this time: %s" % (
+    """Only supported on 10.12+."""
+    if not LooseVersion(os_vers()) >= LooseVersion('10.12'):
+        status = "Your OS is not supported: %s" % (
             platform.mac_ver()[0])
         logging.warn(status)
         write_to_cache_location(None, status, None)
@@ -220,7 +184,7 @@ def write_to_cache_location(data, status, past_loc):
     output_file = os.path.join(pref('CacheDir'), "location.plist")
     logging.debug("Writing current run details to: %s",
                   output_file)
-    plistlib.writePlist(plist, output_file)
+    FoundationPlist.writePlist(plist, output_file)
 
 
 def retrieve_past_location():
@@ -261,46 +225,28 @@ def kill_services():
 
 
 def service_handler(action):
-    """Loads/unloads System's location services launchd job."""
+    """Loads/unloads System's location services job on supported OSs."""
+    supported, current = LooseVersion('10.12.4'), LooseVersion(os_vers())
     if action is 'load':
         kill_services()
-    logging.debug("Currently %sing locationd service", action)
-    launchctl = ['/bin/launchctl', action,
-                 '/System/Library/LaunchDaemons/com.apple.locationd.plist']
-    subprocess.check_output(launchctl)
+    if current < supported:
+        logging.debug("Currently %sing locationd service", action)
+        launchctl = ['/bin/launchctl', action,
+                     '/System/Library/LaunchDaemons/com.apple.locationd.plist']
+        subprocess.check_output(launchctl)
 
 
 def sysprefs_boxchk():
     """Enables location services in sysprefs globally."""
-    uuid = get_hardware_uuid()
-    prefdir = "/private/var/db/locationd/Library/Preferences/ByHost/"
-    if not os.path.exists(prefdir):
-        logging.debug("Locationd pref directory not present. Creating now.")
-        os.makedirs(prefdir)
-    das_plist = ("/private/var/db/locationd/Library/Preferences"
-                 "/ByHost/com.apple.locationd.{0}.plist".format(uuid.strip()))
-    bkup_plist = ("/private/var/db/locationd/Library/Preferences"
-                  "/ByHost/com.apple.locationd.notbackedup.{0}.plist".format(
-                   uuid.strip()))
-
     # Use the offical Apple API for determining location services status
     ls_status = CLLocationManager.locationServicesEnabled()
     if ls_status is not True:
         logging.info("Location Services are not enabled")
         service_handler('unload')
-        cmd = ['/usr/bin/defaults', 'write', das_plist,
-               'LocationServicesEnabled', '-int', '1']
-        subprocess.check_output(cmd)
-        os.chown(das_plist, 205, 205)
-
-        # 10.12 created a new 'notbackedup' file and although changing it
-        # is not necessary, we are making the change so it matches Apple's
-        # implementation.
-        if int(os_vers()) >= 12:
-            cmd = ['/usr/bin/defaults', 'write', bkup_plist,
-                   'LocationServicesEnabled', '-int', '1']
-            subprocess.check_output(cmd)
-            os.chown(bkup_plist, 205, 205)
+        write_cmd = ['/usr/bin/sudo', '-u', '_locationd', '/usr/bin/defaults',
+                     '-currentHost', 'write', 'com.apple.locationd',
+                     'LocationServicesEnabled', '-bool', 'TRUE']
+        subprocess.check_output(write_cmd)
         logging.info("Location Services have been enabled")
         service_handler('load')
     else:
@@ -309,15 +255,20 @@ def sysprefs_boxchk():
 
 def add_python():
     """Python dict for clients.plist in locationd settings."""
-    auth_plist = {}
-    current_os = int(os_vers())
     domain = 'org.python.python'
-    binary_path = ('/System/Library/Frameworks/Python.framework/'
-                   'Versions/2.7/Resources/Python.app/Contents/MacOS/Python')
-
-    if current_os == 11:
-        domain = "com.apple.locationd.executable-%s" % binary_path
-
+    bundle_path = ('/System/Library/Frameworks/Python.framework/'
+                   'Versions/2.7/Resources/Python.app')
+    executable_path = '{}/Contents/MacOS/Python'.format(bundle_path)
+    requirement = 'identifier "org.python.python" and anchor apple'
+    auth_plist = {'Authorized': True,
+                  'BundleId': domain,
+                  'BundlePath': bundle_path,
+                  'Executable': executable_path,
+                  'Hide': 0,
+                  'Registered': '',
+                  'Requirement': requirement,
+                  'Whitelisted': False,
+                  }
     das_plist = '/private/var/db/locationd/clients.plist'
     try:
         clients_dict = FoundationPlist.readPlist(das_plist)
@@ -338,9 +289,6 @@ def add_python():
     except KeyError:
         need_to_run = True
 
-    # El Capital added a cdhash requirement that is difficult to calculate.
-    # As such we are allowing the system to correctly input the values and
-    # then giving Python access to LS.
     if need_to_run:
         logging.info("We need to authorize python")
         service_handler('unload')
@@ -348,23 +296,9 @@ def add_python():
         FoundationPlist.writePlist(clients_dict, das_plist)
         os.chown(das_plist, 205, 205)
         service_handler('load')
-        logging.debug("Process a lookup so locationd service can properly "
-                      "authorize python for your OS.")
-        lookup('apple', 1)
-        service_handler('unload')
-        clients_dict = FoundationPlist.readPlist(das_plist)
-        auth_plist = clients_dict[domain]
-        auth_plist["Authorized"] = True
-        FoundationPlist.writePlist(clients_dict, das_plist)
-        os.chown(das_plist, 205, 205)
-        service_handler('load')
-        clients_dict = FoundationPlist.readPlist(das_plist)
-        val = clients_dict.get(domain, None)
         logging.debug("Current location domain of client.plist is now: ")
-        logging.debug(val)
-        logging.info("Location Services was enabled. "
-                     "We are waiting 30 seconds before doing a lookup.")
-        sleep(30)
+        logging.debug(clients_dict.get(domain, None))
+        logging.info("Location Services was enabled.")
     else:
         logging.info("Python is enabled")
 
@@ -375,7 +309,6 @@ def lookup(service, time=None):
     global plist
     if service == 'apple':
         if time == 1:
-            # pylint: disable=W0612
             finder = MyLocationManagerDelegate.alloc().init()
             NSRunLoop.currentRunLoop().\
                 runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
@@ -599,9 +532,6 @@ class wireless(object):
             return False
 
 
-# Disable PyLints unused argument check as the NSObject
-# requires the arguments even if we do not use them.
-# pylint: disable=W0613
 class MyLocationManagerDelegate(NSObject):
     """CoreLocation delegate for handling location lookups. This class
     is required for python to properly start/stop lookups with location
@@ -665,8 +595,6 @@ class MyLocationManagerDelegate(NSObject):
         plist = dict(CurrentStatus=str("Unsuccessful: " + status))
         logging.warn("Apple lookup request failed")
         logging.debug("Unsuccessful lookup request: %s", status)
-
-# pylint: enable=W0613
 
 
 class ReverseLookup(object):
