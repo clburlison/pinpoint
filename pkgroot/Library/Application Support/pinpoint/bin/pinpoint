@@ -32,7 +32,7 @@ from Foundation import (CFPreferencesAppSynchronize, CFPreferencesCopyAppValue,
                         kCFPreferencesAnyUser, kCFPreferencesCurrentHost)
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '2.0.0.83'
+__version__ = '2.0.0.84'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -660,7 +660,7 @@ class ReverseLookup(object):
             address = 'Address lookup has been disabled on this computer.'
 
         # update plist with the address data
-        add = dict(Address=str(address))
+        add = dict(Address=address.encode('UTF-8'))
         logging.info("Address is: %s", address)
         plist.update(add)
 
