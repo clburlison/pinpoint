@@ -33,7 +33,6 @@ Based off of works by:
 | Author  |  Project Link |
 |---|---|
 | [@arubdesu](https://github.com/arubdesu) | [arubdesu/b72585771a9f606ad800](https://gist.github.com/arubdesu/b72585771a9f606ad800) |
-| [@pudquick](https://github.com/pudquick) | [pudquick/c7dd1262bd81a32663f0](https://gist.github.com/pudquick/c7dd1262bd81a32663f0) |
 | [@pudquick](https://github.com/pudquick) | [pudquick/329142c1740500bd3797](https://gist.github.com/pudquick/329142c1740500bd3797) |
 | [@lindes](https://github.com/lindes)     | [lindes/get-location/](https://github.com/lindes/get-location/) |
 | [@chilcote](https://github.com/chilcote) | [chilcote/outset](https://github.com/chilcote/outset/) |
