@@ -19,7 +19,9 @@ clean:
 
 ##  pkg - Create a package using pkgbuild
 pkg: clean
-	pkgbuild --root pkgroot --scripts scripts --identifier ${PKGID} ${PB_EXTRA_ARGS} --version ${PKGVERSION} --ownership recommended ./${PKGTITLE}-${PKGVERSION}.pkg
+	# pkgbuild --root pkgroot --scripts scripts --identifier ${PKGID} ${PB_EXTRA_ARGS} --version ${PKGVERSION} --ownership recommended ./${PKGTITLE}-${PKGVERSION}.pkg
+	./build.py ${PKGVERSION} ${PKGID} ${PKGTITLE}
+
 
 ##  dmg - Wrap the package inside a dmg
 dmg: pkg
