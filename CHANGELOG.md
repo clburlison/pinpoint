@@ -1,5 +1,16 @@
 # Change Log
 
+## [v2.0.1](https://github.com/clburlison/pinpoint/tree/v2.0.1) (2018-02-26)
+[Full Changelog](https://github.com/clburlison/pinpoint/compare/v2.0.0...v2.0.1)
+
+**Fixed bugs:**
+
+- Location lookup via Google does not work [\#27](https://github.com/clburlison/pinpoint/issues/27)
+
+**Merged pull requests:**
+
+- Googleapi fix [\#30](https://github.com/clburlison/pinpoint/pull/30) ([danner26](https://github.com/danner26))
+
 ## [v2.0.0](https://github.com/clburlison/pinpoint/tree/v2.0.0) (2017-12-12)
 [Full Changelog](https://github.com/clburlison/pinpoint/compare/v2.0.0beta1...v2.0.0)
 
