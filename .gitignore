@@ -1,6 +1,6 @@
 .DS_Store
 tmp/
-.pyc
+*.pyc
 *.pkg
 *.dmg
 examples/pinpoint-script/pkgroot/*

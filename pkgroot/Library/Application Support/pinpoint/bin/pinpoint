@@ -21,7 +21,7 @@ from distutils.version import LooseVersion
 from stat import S_IWOTH, S_IXOTH
 from threading import Timer
 from time import gmtime, sleep, strftime
-from urllib2 import HTTPError, URLError, urlopen
+from urllib2 import HTTPError, URLError, urlopen, Request
 
 import FoundationPlist
 import objc
@@ -70,6 +70,7 @@ def pref(pref_name):
         'EnableWireless': False,
         'DisableWireless': False,
         'LookupService': 'apple',
+        'GoogleApiKey': 'none',
     }
     pref_value = CFPreferencesCopyAppValue(pref_name, BUNDLE_ID)
     if pref_value is None:
@@ -303,7 +304,7 @@ def add_python():
         logging.info("Python is enabled")
 
 
-def lookup(service, time=None):
+def lookup(service, api_key, time=None):
     """Have Apple's CoreLocation framework or Google's Geocoding API find
     the current location."""
     global plist
@@ -327,24 +328,44 @@ def lookup(service, time=None):
                 except KeyError:
                     time += 5
     if service == 'google':
+        if api_key.lower() == 'none':
+            status = "Google API key not provided."
+            plist = dict(CurrentStatus=str("Unsuccessful: " + status))
+            logging.warn(status)
+            exit(0)
         scan = wireless().wireless_scan()
-        api_url = ("https://maps.googleapis.com/maps/api"
-                   "/browserlocation/json?browser=firefox")
-
+        api_url = ("https://www.googleapis.com/geolocation/"
+                   "v1/geolocate?key=" + api_key)
         # We only send the closet five access points in our api request
+        request_data = {
+          "considerIp": "false",
+          "wifiAccessPoints": []
+        }
         count = 0
         for i, val in enumerate(scan):
-            api_url += ('&wifi=mac:{0}&ssid:{1}&ss:{2}'.format(
-                         val.get('BSSID'),
-                         val.get('SSID_STR'),
-                         val.get('RSSI')))
+            request_data['wifiAccessPoints'].append({
+                'macAddress':val.get('BSSID'),
+                'signalStrength':val.get('RSSI'),
+                'signalToNoiseRatio':0})
             count += 1
             if count == 5:
                 break
-
-        data = download_file(api_url)
-        if data is not False:
-            obj = json.loads(data)
+        dump = json.dumps(request_data).encode("utf8")
+        try:
+            request = Request(api_url, dump,
+                {'Content-type': 'application/json'})
+            f = urlopen(request)
+            data = f.read()
+            f.close()
+            data = json.loads(data)
+        except HTTPError, e:
+            data = False
+            logging.debug("HTTP Error: %s, %s", e.code, api_url)
+        except URLError, e:
+            data = False
+            logging.debug("URL Error: %s, %s", e.reason, api_url)
+        if ((data is not False) and ('error' not in data)) :
+            obj = data;
             lat = plist['Latitude'] = obj["location"]["lat"]
             lon = plist['Longitude'] = obj["location"]["lng"]
             gmap = (r"https://www.google.com/maps/place/{0},{1}"
@@ -363,7 +384,6 @@ def lookup(service, time=None):
             status = "Google lookup request failed"
             plist = dict(CurrentStatus=str("Unsuccessful: " + status))
             logging.warn(status)
-
 
 def download_file(url):
     """Download a simple file from the Internet."""
@@ -681,6 +701,8 @@ def main():
                         'last check time.')
     parser.add_argument('-l', '--lookup', required=False,
                         help='Override the configured lookup service.')
+    parser.add_argument('-k', '--apikey', required=False,
+                        help='API key for the Google lookup service.')
     parser.add_argument('-a', '--address', required=False,
                         help='Override the configured address lookup service.')
     parser.add_argument('-V', '--version', action='store_true',
@@ -744,6 +766,11 @@ def main():
     else:
         lookup_service = pref('LookupService').lower()
 
+    if args.apikey:
+        api_key = args.apikey
+    else:
+        api_key = pref('GoogleApiKey')
+
     if args.address:
         address_lookup_service = args.address.lower()
     else:
@@ -783,7 +810,7 @@ def main():
             # we ignore the result of the preflight
 
             # Process our lookup and reverse lookup
-            lookup(lookup_service)
+            lookup(lookup_service, api_key)
             ReverseLookup().address_lookup(address_lookup_service)
 
             # Set the fall back error status
