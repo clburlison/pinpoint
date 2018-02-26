@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="1">
-    <title>Deputy replace_version</title>
+    <title>pinpoint replace_version</title>
     <pkg-ref id="com.clburlison.pinpoint"/>
     <options rootVolumeOnly="true" />
     <volume-check>

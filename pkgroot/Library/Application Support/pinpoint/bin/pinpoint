@@ -32,7 +32,7 @@ from Foundation import (CFPreferencesAppSynchronize, CFPreferencesCopyAppValue,
                         kCFPreferencesAnyUser, kCFPreferencesCurrentHost)
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '2.0.1.93'
+__version__ = '2.0.1.94'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
