@@ -4,3 +4,4 @@ tmp/
 *.pkg
 *.dmg
 examples/pinpoint-script/pkgroot/*
+config.mk

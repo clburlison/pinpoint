@@ -8,6 +8,8 @@ PB_EXTRA_ARGS+= --sign "Developer ID Installer: Clayton Burlison"
 
 #################################################
 
+-include config.mk
+
 ##Help - Show this help menu
 help: 
 	@fgrep -h "##" $(MAKEFILE_LIST) | fgrep -v fgrep | sed -e 's/\\$$//' | sed -e 's/##//'
@@ -32,3 +34,12 @@ dmg: pkg
 	cp -R ./${PKGTITLE}-${PKGVERSION}.pkg /tmp/${PROJECT}-build
 	hdiutil create -srcfolder /tmp/${PROJECT}-build -volname "${PROJECT}" -format UDZO -o ${PROJECT}-${PKGVERSION}.dmg
 	rm -rf /tmp/${PROJECT}-build
+
+## changelog - Update the changelog file (repo maintainer task)
+changelog:
+	docker run -it --rm -v "$(shell pwd)":/usr/local/src/your-app \
+	clburlison/github-changelog-generator \
+	-u clburlison -p pinpoint \
+	-t ${CHANGELOG_GITHUB_TOKEN}
+	git add "CHANGELOG.md"
+	git commit -m "chore: Update changelog"
