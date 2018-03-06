@@ -1,5 +1,13 @@
 # Change Log
 
+## [Unreleased](https://github.com/clburlison/pinpoint/tree/HEAD)
+
+[Full Changelog](https://github.com/clburlison/pinpoint/compare/v2.0.1...HEAD)
+
+**Implemented enhancements:**
+
+- Fallback Option for Location/ReverseLookup [\#33](https://github.com/clburlison/pinpoint/pull/33) ([clburlison](https://github.com/clburlison))
+
 ## [v2.0.1](https://github.com/clburlison/pinpoint/tree/v2.0.1) (2018-02-26)
 [Full Changelog](https://github.com/clburlison/pinpoint/compare/v2.0.0...v2.0.1)
 

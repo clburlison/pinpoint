@@ -35,7 +35,7 @@ dmg: pkg
 	hdiutil create -srcfolder /tmp/${PROJECT}-build -volname "${PROJECT}" -format UDZO -o ${PROJECT}-${PKGVERSION}.dmg
 	rm -rf /tmp/${PROJECT}-build
 
-## changelog - Update the changelog file (repo maintainer task)
+##  changelog - Update the changelog file (repo maintainer task)
 changelog:
 	docker run -it --rm -v "$(shell pwd)":/usr/local/src/your-app \
 	clburlison/github-changelog-generator \
