@@ -2,7 +2,7 @@
 # encoding: utf-8
 """
 pinpoint is a python based script that is able to find the location of your
-Mac using either Apple's or Google's GeoCoding APIs.
+Mac using either Apple's or Google's GeoLocation APIs.
 More information at https://github.com/clburlison/pinpoint
 """
 
@@ -32,7 +32,7 @@ from Foundation import (CFPreferencesAppSynchronize, CFPreferencesCopyAppValue,
                         kCFPreferencesAnyUser, kCFPreferencesCurrentHost)
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '2.0.1.94'
+__version__ = '2.0.1.96'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -71,6 +71,7 @@ def pref(pref_name):
         'DisableWireless': False,
         'LookupService': 'apple',
         'GoogleApiKey': 'none',
+        'Fallback': False,
     }
     pref_value = CFPreferencesCopyAppValue(pref_name, BUNDLE_ID)
     if pref_value is None:
@@ -305,85 +306,125 @@ def add_python():
 
 
 def lookup(service, api_key, time=None):
-    """Have Apple's CoreLocation framework or Google's Geocoding API find
-    the current location."""
-    global plist
+    """Call lookup_apple or lookup_google to find the location.
+
+    Args:
+        service: 'apple' or 'google' to determine the lookup provider
+        api_key: The google api key
+        time: The lookup time in seconds. Should only pass 1 or None.
+
+    Returns:
+        A boolean value to determine if the lookup was successful.
+
+    """
     if service == 'apple':
-        if time == 1:
+        return lookup_apple(time)
+    if service == 'google':
+        return lookup_google(api_key)
+
+
+def lookup_apple(time):
+    """Locate this mac via the Apple Location Services framework.
+
+    Args:
+        time: The lookup time in seconds. Should only pass 1 or None.
+
+    Returns:
+        A boolean value to determine if the lookup was successful.
+
+    """
+    global plist
+    if time == 1:
+        finder = MyLocationManagerDelegate.alloc().init()
+        NSRunLoop.currentRunLoop().\
+            runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
+    else:
+        time = 5
+        # Run 3 loops in an attempt to find a location.
+        # Each loop increases time by 5 seconds.
+        for x in range(3):
+            logging.debug("Running lookup loop: %s", x)
             finder = MyLocationManagerDelegate.alloc().init()
             NSRunLoop.currentRunLoop().\
                 runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
-        else:
-            time = 5
-            # Run 3 loops in an attempt to find a location.
-            # Each loop increases time by 5 seconds.
-            for x in range(3):
-                logging.debug("Running lookup loop: %s", x)
-                finder = MyLocationManagerDelegate.alloc().init()
-                NSRunLoop.currentRunLoop().\
-                    runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
-                try:
-                    if plist['Latitude'] is not None:
-                        break
-                except KeyError:
-                    time += 5
-    if service == 'google':
-        if api_key.lower() == 'none':
-            status = "Google API key not provided."
-            plist = dict(CurrentStatus=str("Unsuccessful: " + status))
-            logging.warn(status)
-            exit(0)
-        scan = wireless().wireless_scan()
-        api_url = ("https://www.googleapis.com/geolocation/"
-                   "v1/geolocate?key=" + api_key)
-        # We only send the closet five access points in our api request
-        request_data = {
-          "considerIp": "false",
-          "wifiAccessPoints": []
-        }
-        count = 0
-        for i, val in enumerate(scan):
-            request_data['wifiAccessPoints'].append({
-                'macAddress':val.get('BSSID'),
-                'signalStrength':val.get('RSSI'),
-                'signalToNoiseRatio':0})
-            count += 1
-            if count == 5:
-                break
-        dump = json.dumps(request_data).encode("utf8")
-        try:
-            request = Request(api_url, dump,
-                {'Content-type': 'application/json'})
-            f = urlopen(request)
-            data = f.read()
-            f.close()
-            data = json.loads(data)
-        except HTTPError, e:
-            data = False
-            logging.debug("HTTP Error: %s, %s", e.code, api_url)
-        except URLError, e:
-            data = False
-            logging.debug("URL Error: %s, %s", e.reason, api_url)
-        if ((data is not False) and ('error' not in data)) :
-            obj = data;
-            lat = plist['Latitude'] = obj["location"]["lat"]
-            lon = plist['Longitude'] = obj["location"]["lng"]
-            gmap = (r"https://www.google.com/maps/place/{0},{1}"
-                    "/@{0},{1},18z/data=!3m1!1e3".format(str(lat), str(lon)))
-            logging.info("Process a lookup request via: %s", service)
-            plist = dict(
-                CurrentStatus=str("Successful"),
-                GoogleMap=str(gmap),
-                LastLocationRun=str(current_time()),
-                Latitude=str(lat),
-                Longitude=str(lon),
-            )
-            logging.debug("Successful lookup request: %s, %s",
-                          plist['Latitude'], plist['Longitude'])
-        else:
-            status = "Google lookup request failed"
-            plist = dict(CurrentStatus=str("Unsuccessful: " + status))
-            logging.warn(status)
+            try:
+                if plist['Latitude'] is not None:
+                    return True
+            except KeyError:
+                time += 5
+        return False
+
+
+def lookup_google(api_key):
+    """Locate this mac via the google GeLocation API.
+
+    Args:
+        api_key: Google API key required for the request
+
+    Returns:
+        A boolean value to determine if the lookup was successful.
+
+    """
+    global plist
+    if api_key.lower() == 'none':
+        status = "Google API key not provided."
+        plist = dict(CurrentStatus=str("Unsuccessful: " + status))
+        logging.warn(status)
+        exit(0)
+    scan = wireless().wireless_scan()
+    api_url = ("https://www.googleapis.com/geolocation/"
+               "v1/geolocate?key=" + api_key)
+    # We only send the closet five access points in our api request
+    request_data = {
+        "considerIp": "false",
+        "wifiAccessPoints": []
+    }
+    count = 0
+    for i, val in enumerate(scan):
+        request_data['wifiAccessPoints'].append({
+            'macAddress': val.get('BSSID'),
+            'signalStrength': val.get('RSSI'),
+            'signalToNoiseRatio': 0})
+        count += 1
+        if count == 5:
+            break
+    dump = json.dumps(request_data).encode("utf8")
+    try:
+        request = Request(api_url, dump,
+                          {'Content-type': 'application/json'})
+        f = urlopen(request)
+        data = f.read()
+        f.close()
+        data = json.loads(data)
+    except HTTPError, e:
+        data = False
+        logging.debug("HTTP Error: %s, %s", e.code, api_url)
+    except URLError, e:
+        data = False
+        logging.debug("URL Error: %s, %s", e.reason, api_url)
+    if ((data is not False) and ('error' not in data)):
+        obj = data
+        lat = plist['Latitude'] = obj["location"]["lat"]
+        lon = plist['Longitude'] = obj["location"]["lng"]
+        gmap = (r"https://www.google.com/maps/place/{0},{1}"
+                "/@{0},{1},18z/data=!3m1!1e3".format(str(lat), str(lon)))
+        logging.info("Process a lookup request via: google")
+        plist = dict(
+            CurrentStatus=str("Successful"),
+            GoogleMap=str(gmap),
+            LastLocationRun=str(current_time()),
+            Latitude=str(lat),
+            Longitude=str(lon),
+        )
+        logging.debug("Successful lookup request: %s, %s",
+                      plist['Latitude'], plist['Longitude'])
+        return True
+    else:
+        status = "Google lookup request failed"
+        plist = dict(CurrentStatus=str("Unsuccessful: " + status))
+        logging.warn(status)
+        return False
+
 
 def download_file(url):
     """Download a simple file from the Internet."""
@@ -515,6 +556,8 @@ class wireless(object):
                          'Apple80211.framework/Versions/A/'
                          'Resources/airport', '-s', '--xml']
                          )
+        # TODO (clburlison): This can error with
+        # FoundationPlist.FoundationPlist.NSPropertyListSerializationException: Encountered unexpected EOF  # noqa
         ssid_scan = FoundationPlist.readPlistFromString(ssid_scan)
         logging.info("Scanning complete")
         values = []
@@ -640,6 +683,7 @@ class ReverseLookup(object):
     def address_lookup(self, service):
         """Resolve coordinates to a street address."""
         global plist
+        exitStatus = True
         api_url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng='
         logging.info("Doing a reverse lookup via: {0}".format(service))
         if pref('AddressLookupService').lower() != 'none':
@@ -656,6 +700,7 @@ class ReverseLookup(object):
                         except:
                             address = 'Google reverse lookup failed.'
                             logging.warn(address)
+                            exitStatus = False
                     elif service == 'apple':
                         # We are storing the lat/lon values as strings
                         # and must convert them to float before passing to
@@ -673,16 +718,20 @@ class ReverseLookup(object):
                         address = ('Unsupported address lookup service: '
                                    '{0}'.format(service))
                         logging.warn(address)
+                        exitStatus = False
             except KeyError:
                 address = 'Unable to determine address'
                 logging.warn(address)
+                exitStatus = False
         else:
             address = 'Address lookup has been disabled on this computer.'
+            exitStatus = False
 
         # update plist with the address data
         add = dict(Address=address.encode('UTF-8'))
         logging.info("Address is: %s", address)
         plist.update(add)
+        return exitStatus
 
 
 def main():
@@ -705,6 +754,9 @@ def main():
                         help='API key for the Google lookup service.')
     parser.add_argument('-a', '--address', required=False,
                         help='Override the configured address lookup service.')
+    parser.add_argument('-b', '--fallback', action='store_true', required=False,
+                        help='Fallback on other service if specified '
+                        'address/lookup service fails')
     parser.add_argument('-V', '--version', action='store_true',
                         help='Print script version')
     args = parser.parse_args()
@@ -776,6 +828,11 @@ def main():
     else:
         address_lookup_service = pref('AddressLookupService').lower()
 
+    if args.fallback:
+        toFallback = True
+    else:
+        toFallback = pref('Fallback')
+
     if args.auto:
         os_check()
         if wireless().get_wireless_interface() is None:
@@ -810,8 +867,19 @@ def main():
             # we ignore the result of the preflight
 
             # Process our lookup and reverse lookup
-            lookup(lookup_service, api_key)
-            ReverseLookup().address_lookup(address_lookup_service)
+            l_status = lookup(lookup_service, api_key)
+            if l_status is not True and toFallback:
+                fb_service = 'google' if lookup_service == 'apple' else 'apple'
+                logging.info("Attempting to fall back to the {} "
+                             "Lookup Service.".format(fb_service))
+                lookup(fb_service, api_key)
+            r_status = ReverseLookup().address_lookup(address_lookup_service)
+            if r_status is not True and toFallback:
+                address_service = 'google' \
+                    if address_lookup_service == 'apple' else 'apple'
+                logging.info("Attempting to fall back to the {} Reverse "
+                             "Lookup Service.".format(address_service))
+                ReverseLookup().address_lookup(address_service)
 
             # Set the fall back error status
             status = ("Error obtaining a location. LS was unresponsive "

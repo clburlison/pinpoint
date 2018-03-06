@@ -10,7 +10,7 @@ Author: Clayton Burlison - https://clburlison.com
 
 # Info
 
-pinpoint is a python based script that is able to find the location of your Mac using either Apple's or Google's GeoCoding APIs.
+pinpoint is a python based script that is able to find the location of your Mac using either Apple's or Google's GeoLocation APIs.
 
 Limited to **10.12-10.13**.
 

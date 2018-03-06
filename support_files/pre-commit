@@ -5,6 +5,12 @@
 
 VERSION_FILE=$(git rev-parse --show-toplevel)"/pkgroot/Library/Application Support/pinpoint/bin/pinpoint"
 COMMIT_COUNT=$(git rev-list HEAD --count)
+BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+
+# Only increase build version on master branch
+if [ "$BRANCH_NAME" != "master" ]; then
+    exit
+fi
 
 # This is a post_commit hook, so we up the count with one
 COMMIT_COUNT=$(( $COMMIT_COUNT + 1 ))
