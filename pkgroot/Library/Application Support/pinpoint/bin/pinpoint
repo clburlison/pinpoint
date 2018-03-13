@@ -614,6 +614,7 @@ class wireless(object):
     objc.loadBundle('CoreWLAN',
                     bundle_path=bundle_path,
                     module_globals=globals())
+    iface = CWInterface.interface()
 
     def get_wireless_interface(self):
         """Get the current wireless interface.
@@ -649,32 +650,29 @@ class wireless(object):
         return wifi_power
 
     def wireless_scan(self):
-        """Scan aviable wireless networks.
+        """Scan available wireless networks.
 
         Returns:
             Sorted array of dictionaries with rssi, bssid, and ssid_str from
             strongest rssi value to weakest.
 
         """
-        logging.info("Scanning for wireless networks...")
-        ssid_scan = subprocess.check_output(
-                        ['/System/Library/PrivateFrameworks/'
-                         'Apple80211.framework/Versions/A/'
-                         'Resources/airport', '-s', '--xml']
-                         )
-        # TODO (clburlison): This can error with
-        # FoundationPlist.FoundationPlist.NSPropertyListSerializationException: Encountered unexpected EOF  # noqa
-        ssid_scan = FoundationPlist.readPlistFromString(ssid_scan)
-        logging.info("Scanning complete")
         values = []
-        for i, val in enumerate(ssid_scan):
-            wifi_stats = {'RSSI': val.get('RSSI'),
-                          'BSSID': val.get('BSSID'),
-                          'SSID_STR': val.get('SSID_STR')
+        logging.info("Scanning for wireless networks...")
+        results, error = self.iface.\
+            scanForNetworksWithName_includeHidden_error_(None, True, None)
+        if error:
+            logging.debug("Error scanning for wireless networks: {}"
+                          "".format(str(error)))
+            return values
+        for i in results:
+            if i.ssid() is None:
+                continue
+            wifi_stats = {'RSSI': i.rssiValue(),
+                          'BSSID': i.bssid(),
+                          'SSID_STR': i.ssid()
                           }
             values.append(wifi_stats)
-
-        # Sort our values by RSSI to increase accuracy of location
         sorted_list = sorted(values, key=lambda k: k['RSSI'], reverse=True)
         logging.debug("Local wireless networks: \n%s", sorted_list)
         return sorted_list
@@ -690,7 +688,6 @@ class wireless(object):
 
         """
         wifi_power = self.wireless_status()
-        iface = CWInterface.interface()
         value = value.lower()
         if value == "on":
             setPower = True
@@ -699,7 +696,7 @@ class wireless(object):
         if (wifi_power == 'Off' and value == "on") or (
             wifi_power == 'On' and value == "off"
         ):
-            iface.setPower_error_(setPower, None)
+            self.iface.setPower_error_(setPower, None)
             logging.debug("Wireless adapter has been turned %s.", value)
             sleep(5)
             return True
