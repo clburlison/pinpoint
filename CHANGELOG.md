@@ -6,7 +6,18 @@
 
 **Implemented enhancements:**
 
+- Use CoreWLAN for wifi scanning [\#37](https://github.com/clburlison/pinpoint/issues/37)
+- Cleanup doc strings [\#35](https://github.com/clburlison/pinpoint/issues/35)
 - Fallback Option for Location/ReverseLookup [\#33](https://github.com/clburlison/pinpoint/pull/33) ([clburlison](https://github.com/clburlison))
+
+**Fixed bugs:**
+
+- Use CoreWLAN for wifi scanning [\#37](https://github.com/clburlison/pinpoint/issues/37)
+
+**Merged pull requests:**
+
+- Corewlan scan [\#39](https://github.com/clburlison/pinpoint/pull/39) ([clburlison](https://github.com/clburlison))
+- style: Cleanup doc strings [\#38](https://github.com/clburlison/pinpoint/pull/38) ([clburlison](https://github.com/clburlison))
 
 ## [v2.0.1](https://github.com/clburlison/pinpoint/tree/v2.0.1) (2018-02-26)
 [Full Changelog](https://github.com/clburlison/pinpoint/compare/v2.0.0...v2.0.1)
