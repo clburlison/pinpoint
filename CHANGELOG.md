@@ -1,8 +1,7 @@
 # Change Log
 
-## [Unreleased](https://github.com/clburlison/pinpoint/tree/HEAD)
-
-[Full Changelog](https://github.com/clburlison/pinpoint/compare/v2.0.1...HEAD)
+## [v2.0.2](https://github.com/clburlison/pinpoint/tree/v2.0.2) (2018-03-27)
+[Full Changelog](https://github.com/clburlison/pinpoint/compare/v2.0.1...v2.0.2)
 
 **Implemented enhancements:**
 
