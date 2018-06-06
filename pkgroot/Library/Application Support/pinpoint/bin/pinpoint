@@ -32,7 +32,7 @@ from Foundation import (CFPreferencesAppSynchronize, CFPreferencesCopyAppValue,
                         kCFPreferencesAnyUser, kCFPreferencesCurrentHost)
 
 __author__ = 'Clayton Burlison (https://clburlison.com)'
-__version__ = '2.0.2.101'
+__version__ = '3.0.0.101'
 
 # Our preferences "bundle_id"
 BUNDLE_ID = 'com.clburlison.pinpoint'
@@ -81,12 +81,12 @@ def pref(pref_name):
 
     """
     default_prefs = {
-        'AddressLookupService': 'apple',
+        'AddressLookupService': 'google',
         'CacheDir': '/Library/Application Support/pinpoint',
         'CheckWaitTime': 1800,
         'EnableWireless': False,
         'DisableWireless': False,
-        'LookupService': 'apple',
+        'LookupService': 'google',
         'GoogleApiKey': 'none',
         'Fallback': False,
     }
@@ -105,26 +105,6 @@ def root_check():
     if not os.geteuid() == 0:
         sys.stderr.write("You must run this as root!")
         exit(1)
-
-
-def os_vers():
-    """Retrieve OS version.
-
-    Returns:
-        The macOS version string. (e.g. - 10.13.3)
-
-    """
-    return platform.mac_ver()[0]
-
-
-def os_check():
-    """Only supported on 10.12+."""
-    if not LooseVersion(os_vers()) >= LooseVersion('10.12'):
-        status = "Your OS is not supported: %s" % (
-            platform.mac_ver()[0])
-        logging.warn(status)
-        write_to_cache_location(None, status, None)
-        exit(0)
 
 
 def current_time():
@@ -265,107 +245,6 @@ def retrieve_past_location():
     return old_location
 
 
-def kill_services():
-    """Force services to restart by killing the process.
-
-    On 10.12+, both the locationd and cfprefsd services like to not respect
-    preference changes so we force them to reload.
-
-    """
-    logging.debug("Currently killing cfprefsd service")
-    proc = subprocess.Popen(['/usr/bin/killall', '-9', 'cfprefsd'],
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE)
-    logging.debug("Currently killing locationd service")
-    proc = subprocess.Popen(['/usr/bin/killall', '-9', 'locationd'],
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE)
-
-
-def service_handler(action):
-    """Loads/unloads the locationd LaunchDaemon on supported OS.
-
-    Args:
-        action: String of 'load' or 'unload' to restart the locationd service
-
-    """
-    supported, current = LooseVersion('10.12.4'), LooseVersion(os_vers())
-    if action is 'load':
-        kill_services()
-    if current < supported:
-        logging.debug("Currently %sing locationd service", action)
-        launchctl = ['/bin/launchctl', action,
-                     '/System/Library/LaunchDaemons/com.apple.locationd.plist']
-        subprocess.check_output(launchctl)
-
-
-def sysprefs_boxchk():
-    """Enable location services in System Preferences."""
-    # Use the offical Apple API for determining location services status
-    ls_status = CLLocationManager.locationServicesEnabled()
-    if ls_status is not True:
-        logging.info("Location Services are not enabled")
-        service_handler('unload')
-        write_cmd = ['/usr/bin/sudo', '-u', '_locationd', '/usr/bin/defaults',
-                     '-currentHost', 'write', 'com.apple.locationd',
-                     'LocationServicesEnabled', '-bool', 'TRUE']
-        subprocess.check_output(write_cmd)
-        logging.info("Location Services have been enabled")
-        service_handler('load')
-    else:
-        logging.info("Location Services are enabled")
-
-
-def add_python():
-    """Python dict for clients.plist in locationd settings."""
-    domain = 'org.python.python'
-    bundle_path = ('/System/Library/Frameworks/Python.framework/'
-                   'Versions/2.7/Resources/Python.app')
-    executable_path = '{}/Contents/MacOS/Python'.format(bundle_path)
-    requirement = 'identifier "org.python.python" and anchor apple'
-    auth_plist = {'Authorized': True,
-                  'BundleId': domain,
-                  'BundlePath': bundle_path,
-                  'Executable': executable_path,
-                  'Hide': 0,
-                  'Registered': '',
-                  'Requirement': requirement,
-                  'Whitelisted': False,
-                  }
-    das_plist = '/private/var/db/locationd/clients.plist'
-    try:
-        clients_dict = FoundationPlist.readPlist(das_plist)
-    except (AttributeError,
-            FoundationPlist.NSPropertyListSerializationException):
-        p = {}
-        FoundationPlist.writePlist(p, das_plist)
-        clients_dict = FoundationPlist.readPlist(das_plist)
-    val = clients_dict.get(domain, None)
-    logging.debug("Current location domain of client.plist is: ")
-    logging.debug(val)
-    need_to_run = False
-    try:
-        if val["Authorized"] is not True:
-            need_to_run = True
-    except TypeError:
-        need_to_run = True
-    except KeyError:
-        need_to_run = True
-
-    if need_to_run:
-        logging.info("We need to authorize python")
-        service_handler('unload')
-        clients_dict[domain] = auth_plist
-        FoundationPlist.writePlist(clients_dict, das_plist)
-        os.chown(das_plist, 205, 205)
-        service_handler('load')
-        logging.debug("Current location domain of client.plist is now: ")
-        logging.debug(clients_dict.get(domain, None))
-        logging.info("Location Services was enabled.")
-    else:
-        logging.info("Python is enabled")
-
-
 def lookup(service, api_key, time=None):
     """Call lookup_apple or lookup_google to find the location.
 
@@ -379,41 +258,10 @@ def lookup(service, api_key, time=None):
 
     """
     if service == 'apple':
-        return lookup_apple(time)
+        # TODO (clburlison): Return deprecated message
+        pass
     if service == 'google':
         return lookup_google(api_key)
-
-
-def lookup_apple(time):
-    """Locate this mac via the Apple Location Services framework.
-
-    Args:
-        time: The lookup time in seconds. Should only pass 1 or None.
-
-    Returns:
-        A boolean value to determine if the lookup was successful.
-
-    """
-    global plist
-    if time == 1:
-        finder = MyLocationManagerDelegate.alloc().init()
-        NSRunLoop.currentRunLoop().\
-            runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
-    else:
-        time = 5
-        # Run 3 loops in an attempt to find a location.
-        # Each loop increases time by 5 seconds.
-        for x in range(3):
-            logging.debug("Running lookup loop: %s", x)
-            finder = MyLocationManagerDelegate.alloc().init()
-            NSRunLoop.currentRunLoop().\
-                runUntilDate_(NSDate.dateWithTimeIntervalSinceNow_(time))
-            try:
-                if plist['Latitude'] is not None:
-                    return True
-            except KeyError:
-                time += 5
-        return False
 
 
 def lookup_google(api_key):
@@ -434,7 +282,7 @@ def lookup_google(api_key):
         exit(0)
     scan = wireless().wireless_scan()
     api_url = ("https://www.googleapis.com/geolocation/"
-               "v1/geolocate?key=" + api_key)
+               "v1/geolocate?key={}".format(api_key))
     # We only send the closet five access points in our api request
     request_data = {
         "considerIp": "false",
@@ -482,7 +330,7 @@ def lookup_google(api_key):
         return True
     else:
         status = "Google lookup request failed"
-        plist = dict(CurrentStatus=str("Unsuccessful: " + status))
+        plist = dict(CurrentStatus=str("Unsuccessful: {}".format(status)))
         logging.warn(status)
         return False
 
@@ -704,87 +552,6 @@ class wireless(object):
             return False
 
 
-class MyLocationManagerDelegate(NSObject):
-    """CoreLocation delegate for handling location lookups.
-
-    Required to properly start/stop lookups with via the CLLocation framework.
-
-    """
-
-    is_authorized = CLLocationManager.authorizationStatus()
-    is_enabled = CLLocationManager.locationServicesEnabled()
-
-    def init(self):
-        """Define location manager settings for lookups."""
-        self = super(MyLocationManagerDelegate, self).init()
-        if not self:
-            return
-        self.locationManager = CLLocationManager.alloc().init()
-        self.locationManager.setDelegate_(self)
-        self.locationManager.setDistanceFilter_(kCLDistanceFilterNone)
-        self.locationManager.setDesiredAccuracy_(kCLLocationAccuracyBest)
-        self.locationManager.startUpdatingLocation()
-        return self
-
-    def locationManager_didUpdateToLocation_fromLocation_(self, manager,
-                                                          newloc, oldloc):
-        """Split location data into separate pieces for processing later.
-
-        Args:
-            manager: Reference to the locationManger from our init()
-            newloc: Reference object to the returned new lat/long location
-            oldloc: Reference object to the last returned lat/long location
-
-        """
-        lat = newloc.coordinate().latitude
-        lon = newloc.coordinate().longitude
-        verAcc = newloc.verticalAccuracy()
-        horAcc = newloc.horizontalAccuracy()
-        altitude = newloc.altitude()
-        time = newloc.timestamp()
-        gmap = (r"https://www.google.com/maps/place/{0},{1}"
-                "/@{0},{1},18z/data=!3m1!1e3".format(str(lat), str(lon)))
-        logging.info("Process a lookup request via: apple")
-        global plist
-        plist = dict(
-            Altitude=int(altitude),
-            CurrentStatus=str("Successful"),
-            GoogleMap=str(gmap),
-            LastLocationRun=str(time),
-            Latitude=str(lat),
-            LatitudeAccuracy=int(verAcc),
-            Longitude=str(lon),
-            LongitudeAccuracy=int(horAcc),
-        )
-        logging.debug("Successful lookup request: %s, %s",
-                      plist['Latitude'], plist['Longitude'])
-
-    def locationManager_didFailWithError_(self, manager, err):
-        """Handlers errors for location manager.
-
-        Args:
-            manager: Reference to the locationManger from our init()
-            err: Reference object to handle CLLocationManager errors
-
-        """
-        if self.is_enabled is True:
-            if self.is_authorized == 3:
-                status = "Unable to locate"
-            if self.is_authorized == 2:
-                status = "Denied"
-            if self.is_authorized == 1:
-                status = "Restricted"
-            if self.is_authorized == 0:
-                status = "Not Determined"
-        else:
-            status = "Location Services Disabled"
-
-        global plist
-        plist = dict(CurrentStatus=str("Unsuccessful: " + status))
-        logging.warn("Apple lookup request failed")
-        logging.debug("Unsuccessful lookup request: %s", status)
-
-
 class ReverseLookup(object):
     """Class to handle reverse lookup requests."""
 
@@ -975,7 +742,6 @@ def main():
         toFallback = pref('Fallback')
 
     if args.auto:
-        os_check()
         if wireless().get_wireless_interface() is None:
             status = "No wireless interface found."
             write_to_cache_location(None, status, None)
@@ -986,8 +752,8 @@ def main():
         # is set to apple.
         logging.debug("Current LookupService is: %s", lookup_service)
         if lookup_service == 'apple':
-            sysprefs_boxchk()
-            add_python()
+            # TODO (clburlison): Output deprecated warning message
+            pass
         if check_wait_period(override):
             update_check_time()
             past_loc = retrieve_past_location()
