@@ -1,12 +1,15 @@
 pinpoint
 ===
 
+# DEPRECATED
+
+Due to changes in 10.13.4, Apple has removed the ability to enable Location Services automatically. With additional changes in 10.14 Apple has added more restrictions. Due to these restricts we no longer have the API calls to maintain this project and future development has stopped.
+
 ![pinpoint logo](/support_files/pinpoint-logo-wide.png)
 
 A python script for finding your Mac.
 
 Author: Clayton Burlison - https://clburlison.com  
-
 
 # Info
 
